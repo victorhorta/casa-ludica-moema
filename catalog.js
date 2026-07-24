@@ -36,7 +36,7 @@
     try{
       var c = await db.from("categories").select("id,slug,name,color,cta_title,cta_text,position").order("position");
       var s = await db.from("sections").select("id,category_id,name,color,position").order("position");
-      var i = await db.from("items").select("id,section_id,title,image_url,position,active").eq("active", true).order("position");
+      var i = await db.from("items").select("id,section_id,title,description,image_url,position,active").eq("active", true).order("position");
       var st = await db.from("settings").select("*").eq("id", 1).maybeSingle();
       if(c.error || s.error || i.error) throw (c.error || s.error || i.error);
       var cats = (c.data || []).map(function(cat){
@@ -60,7 +60,8 @@
     var media = item.image_url
       ? '<div class="thumb" style="padding:0"><img src="'+esc(item.image_url)+'" alt="'+esc(item.title)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover"/></div>'
       : '<div class="thumb"><div class="ph">'+PH+'<span>foto do produto</span></div></div>';
-    return '<div class="card reveal" style="--i:'+idx+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4></div></div>';
+    var desc = item.description ? '<p class="cap-desc">'+esc(item.description)+'</p>' : '';
+    return '<div class="card reveal" style="--i:'+idx+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4>'+desc+'</div></div>';
   }
 
   function sectionHTML(sec, catColor){

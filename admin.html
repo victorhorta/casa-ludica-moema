@@ -56,9 +56,11 @@
   .sec{border:1px solid var(--linha);border-radius:12px;padding:14px;margin-top:12px;background:#fbfbfe}
   .sec > .shead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .items{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-  .item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px}
+  .item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px;flex-wrap:wrap}
   .item .thumb{width:52px;height:52px;border-radius:8px;background:#eef;flex:none;object-fit:cover;display:flex;align-items:center;justify-content:center;color:var(--suave);font-size:.6rem;text-align:center}
   .item .grow{flex:1;min-width:120px}
+  .item .desc{flex-basis:100%;order:10}
+  .item .desc textarea{width:100%;min-height:36px;font-size:.82rem}
   .addrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
   .addrow input[type=text]{flex:1;min-width:140px}
   .pill{font-size:.72rem;font-family:var(--ff-d);padding:2px 9px;border-radius:999px;background:#eef;color:var(--suave)}
@@ -167,6 +169,7 @@
       + '<div class="wrap" style="padding:8px 20px 60px">'
       + '<div class="tabs">'
       +   '<button data-tab="catalogo">Catálogo</button>'
+      +   '<button data-tab="importar">Importar em lote</button>'
       +   '<button data-tab="config">Configurações</button>'
       +   '<button data-tab="leads">Leads</button>'
       + '</div>'
@@ -181,6 +184,7 @@
     b.classList.toggle("on", b.dataset.tab===state.tab); }); }
   function renderTab(){
     if(state.tab==="catalogo") renderCatalogo();
+    else if(state.tab==="importar") renderImport();
     else if(state.tab==="config") renderConfig();
     else renderLeads();
   }
@@ -237,6 +241,7 @@
     its.forEach(function(it){ h += itemRow(it); });
     h += '</div>'
       + '<div class="addrow"><input type="text" id="ni-'+sec.id+'" placeholder="Título do novo item" />'
+      +   '<input type="text" id="nd-'+sec.id+'" placeholder="Descrição (opcional)" />'
       +   '<input type="file" id="nf-'+sec.id+'" accept="image/*" />'
       +   '<button class="btn sm" data-act="item-add" data-id="'+sec.id+'">+ Adicionar item</button></div>'
       + '</div>';
@@ -257,6 +262,7 @@
       + '<button class="icobtn" data-act="item-up" data-id="'+it.id+'" title="Subir">↑</button>'
       + '<button class="icobtn" data-act="item-down" data-id="'+it.id+'" title="Descer">↓</button>'
       + '<button class="icobtn" data-act="item-del" data-id="'+it.id+'" title="Excluir">✕</button>'
+      + '<div class="desc"><textarea id="id-'+it.id+'" placeholder="Descrição (dimensões, especificações...)" data-act="item-desc" data-id="'+it.id+'">'+esc(it.description)+'</textarea></div>'
       + '</div>';
   }
 
@@ -283,6 +289,7 @@
       var act=b.dataset.act, id=b.dataset.id;
       if(act==="sec-save") return saveSection(id);
       if(act==="item-title") return saveItemTitle(id);
+      if(act==="item-desc") return saveItemDesc(id);
       if(act==="item-active") return toggleItem(id, b.checked);
       if(act==="item-img") return uploadItemImage(id, b.files[0]);
     };
@@ -344,8 +351,9 @@
     var url = "";
     if(file){ url = await uploadImage(file); if(url===null){ return; } }
     var count = itemsOf(secId).length;
+    var descEl = document.getElementById("nd-"+secId);
     var r = await db.from("items").insert({section_id:secId, title:title, image_url:url||null,
-      position:count, active:true});
+      description:(descEl&&descEl.value.trim())||null, position:count, active:true});
     if(r.error){ toast("Erro ao criar item."); return; }
     await refresh(); toast("Item adicionado.");
   }
@@ -354,6 +362,13 @@
     if(r.error){ toast("Erro ao salvar item."); return; }
     var it = state.items.find(function(x){return x.id===id;}); if(it) it.title = val("it-"+id);
     toast("Item salvo.");
+  }
+  async function saveItemDesc(id){
+    var d = val("id-"+id);
+    var r = await db.from("items").update({description: d||null}).eq("id", id);
+    if(r.error){ toast("Erro ao salvar descrição."); return; }
+    var it = state.items.find(function(x){return x.id===id;}); if(it) it.description = d;
+    toast("Descrição salva.");
   }
   async function toggleItem(id, active){
     var r = await db.from("items").update({active: !!active}).eq("id", id);
@@ -394,6 +409,109 @@
     var tmp = arr[i]; arr[i]=arr[j]; arr[j]=tmp;
     for(var k=0;k<arr.length;k++){ await db.from(table).update({position:k}).eq("id", arr[k].id); }
     await refresh();
+  }
+
+  /* ============================ IMPORTAR EM LOTE ============================ */
+  var DEFAULT_STRUCTURE = [
+    {slug:"escolas", name:"Escolas", color:"#109E63",
+      cta_title:"Quer conhecer as soluções para sua escola?",
+      cta_text:"Deixe seu e-mail e nossa equipe envia o catálogo completo e condições especiais.",
+      sections:[{name:"Playground",color:"#109E63"},{name:"Recursos educacionais",color:"#2EBD48"}]},
+    {slug:"clinicas", name:"Clínicas & Consultórios", color:"#01ACBE",
+      cta_title:"Monte um ambiente acolhedor no seu consultório",
+      cta_text:"Deixe seu e-mail e receba nossa curadoria de itens para clínicas e consultórios.",
+      sections:[{name:"Sala de espera",color:"#01ACBE"},{name:"Mobiliário",color:"#5F94DA"},{name:"Recursos terapêuticos",color:"#8857B8"}]},
+    {slug:"espacos", name:"Espaços de brincar", color:"#FF5995",
+      cta_title:"Vamos criar um espaço de brincar inesquecível?",
+      cta_text:"Deixe seu e-mail e receba ideias e o catálogo para o seu espaço.",
+      sections:[{name:"Mobiliário externo",color:"#FF5995"},{name:"Mobiliário interno",color:"#FF8736"}]}
+  ];
+
+  function normalize(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim(); }
+  function findSection(catRef, secName){
+    var cat = state.cats.find(function(c){ return normalize(c.slug)===normalize(catRef) || normalize(c.name)===normalize(catRef); });
+    if(!cat) return null;
+    return state.sections.find(function(s){ return s.category_id===cat.id && normalize(s.name)===normalize(secName); }) || null;
+  }
+
+  function renderImport(){
+    var sample = '[\n  {"file":"item1.png","title":"Kit Bandinha Frutas","description":"9 instrumentos","category":"escolas","section":"Recursos educacionais"},\n  {"file":"item2.png","title":"Playground modular","description":"3 m x 2 m","category":"escolas","section":"Playground"}\n]';
+    document.getElementById("tabc").innerHTML =
+      '<div class="card">'
+      + '<h3 style="margin-bottom:6px">Importar vários itens de uma vez</h3>'
+      + '<p class="muted" style="margin:0 0 14px">Selecione as imagens e cole a tabela (JSON) com os dados de cada item. O campo <b>file</b> deve ser o nome exato do arquivo da imagem.</p>'
+      + '<div class="warn" id="imp-struct-warn" style="'+(state.cats.length?'display:none':'')+'">As categorias/seções ainda não existem. Clique abaixo para criá-las no padrão do site.</div>'
+      + '<button class="btn ghost sm" id="imp-seed" style="margin-bottom:14px">Criar categorias e seções padrão</button>'
+      + '<div style="margin-bottom:12px"><label>Imagens dos itens</label><input type="file" id="imp-files" accept="image/*" multiple /></div>'
+      + '<div style="margin-bottom:12px"><label>Dados dos itens (JSON)</label><textarea id="imp-json" rows="10" style="font-family:var(--ff-mono,monospace);font-size:.82rem">'+sample+'</textarea></div>'
+      + '<div class="row"><button class="btn g" id="imp-run">Importar itens</button>'
+      + '<span class="muted" id="imp-count"></span></div>'
+      + '<div id="imp-log" style="margin-top:14px;font-size:.85rem;white-space:pre-wrap"></div>'
+      + '</div>';
+    document.getElementById("imp-seed").onclick = seedStructure;
+    document.getElementById("imp-run").onclick = importBatch;
+    var fi=document.getElementById("imp-files");
+    fi.onchange=function(){ document.getElementById("imp-count").textContent = fi.files.length+" imagem(ns) selecionada(s)"; };
+  }
+
+  async function seedStructure(){
+    var log = document.getElementById("imp-log"); log.textContent="Criando categorias e seções...";
+    try{
+      for(var i=0;i<DEFAULT_STRUCTURE.length;i++){
+        var d=DEFAULT_STRUCTURE[i];
+        var cat=state.cats.find(function(c){return c.slug===d.slug;});
+        if(!cat){
+          var rc=await db.from("categories").insert({slug:d.slug,name:d.name,color:d.color,cta_title:d.cta_title,cta_text:d.cta_text,position:i}).select().single();
+          if(rc.error) throw rc.error; cat=rc.data;
+        }
+        var existing=(await db.from("sections").select("name").eq("category_id",cat.id)).data||[];
+        var have=existing.map(function(x){return normalize(x.name);});
+        for(var j=0;j<d.sections.length;j++){
+          var sec=d.sections[j];
+          if(have.indexOf(normalize(sec.name))<0){
+            var rs=await db.from("sections").insert({category_id:cat.id,name:sec.name,color:sec.color,position:j});
+            if(rs.error) throw rs.error;
+          }
+        }
+      }
+      await loadAll();
+      log.textContent="Categorias e seções prontas.";
+      var w=document.getElementById("imp-struct-warn"); if(w) w.style.display="none";
+      toast("Estrutura criada.");
+    }catch(e){ log.textContent="Erro ao criar estrutura: "+(e.message||e); }
+  }
+
+  async function importBatch(){
+    var log=document.getElementById("imp-log"); log.textContent="";
+    var entries;
+    try{ entries=JSON.parse(document.getElementById("imp-json").value); if(!Array.isArray(entries)) throw new Error("O JSON deve ser uma lista []"); }
+    catch(e){ log.textContent="JSON inválido: "+(e.message||e); return; }
+    var files={}; var fl=document.getElementById("imp-files").files;
+    for(var i=0;i<fl.length;i++){ files[fl[i].name]=fl[i]; }
+    var okc=0, fail=0, lines=[];
+    // posição base por seção (para anexar em ordem)
+    var posBySec={};
+    for(var k=0;k<entries.length;k++){
+      var e=entries[k]; var label=(e.title||e.file||("item "+(k+1)));
+      var sec=findSection(e.category, e.section);
+      if(!sec){ fail++; lines.push("✗ "+label+" — seção não encontrada ("+e.category+" / "+e.section+")"); continue; }
+      var url=null;
+      if(e.file){
+        var f=files[e.file];
+        if(!f){ fail++; lines.push("✗ "+label+" — arquivo não selecionado: "+e.file); continue; }
+        url=await uploadImage(f);
+        if(url===null){ fail++; lines.push("✗ "+label+" — falha no upload da imagem"); continue; }
+      }
+      if(posBySec[sec.id]===undefined) posBySec[sec.id]=itemsOf(sec.id).length;
+      var pos=posBySec[sec.id]++;
+      var r=await db.from("items").insert({section_id:sec.id, title:e.title||label, description:e.description||null, image_url:url, position:pos, active:true});
+      if(r.error){ fail++; lines.push("✗ "+label+" — "+(r.error.message||"erro ao inserir")); }
+      else { okc++; lines.push("✓ "+label+" → "+e.category+" / "+e.section); }
+      log.textContent=lines.join("\n");
+    }
+    await loadAll();
+    log.textContent=lines.join("\n")+"\n\nConcluído: "+okc+" importado(s), "+fail+" falha(s).";
+    toast("Importação concluída: "+okc+" ok, "+fail+" falha(s).");
   }
 
   /* ============================ CONFIGURAÇÕES ============================ */
