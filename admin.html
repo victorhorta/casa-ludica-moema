@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Casa Lúdica Moema — Portal do Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --azul-noite:#373A81; --tinta:#373A81; --suave:#6a6ca6; --linha:#e6e8f5;
+    --bg:#f5f6fc; --branco:#fff; --verde:#109E63; --vermelho:#E73236; --amarelo:#FDBF35;
+    --r:14px; --ff-d:'Fredoka',sans-serif; --ff-t:'Poppins',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tinta);font-family:var(--ff-t);line-height:1.5}
+  h1,h2,h3,h4{font-family:var(--ff-d);font-weight:600;margin:0}
+  a{color:var(--azul-noite)}
+  img{max-width:100%;display:block}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+  button{font-family:var(--ff-d);cursor:pointer}
+  input,select,textarea{font-family:var(--ff-t);font-size:.94rem;color:var(--tinta)}
+  input[type=text],input[type=email],input[type=password],select,textarea{
+    width:100%;border:1px solid var(--linha);border-radius:10px;padding:9px 12px;background:#fff;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--azul-noite)}
+  label{font-size:.78rem;font-weight:500;color:var(--suave);font-family:var(--ff-d);display:block;margin:0 0 4px}
+  .btn{border:none;border-radius:999px;padding:10px 18px;font-weight:500;font-size:.9rem;background:var(--azul-noite);color:#fff}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.g{background:var(--verde)} .btn.r{background:var(--vermelho)}
+  .btn.ghost{background:#fff;color:var(--azul-noite);border:1px solid var(--linha)}
+  .btn.sm{padding:6px 12px;font-size:.82rem}
+  .icobtn{border:1px solid var(--linha);background:#fff;border-radius:8px;width:32px;height:32px;font-size:1rem;color:var(--suave);line-height:1}
+  .icobtn:hover{border-color:var(--azul-noite);color:var(--azul-noite)}
+  .card{background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:18px}
+  .muted{color:var(--suave);font-size:.86rem}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+
+  /* topo */
+  header.top{background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:10}
+  header.top .wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 20px}
+  header.top img{height:40px}
+  .tabs{display:flex;gap:6px;margin:22px 0}
+  .tabs button{background:#fff;border:1px solid var(--linha);border-radius:999px;padding:9px 18px;font-size:.9rem;color:var(--suave)}
+  .tabs button.on{background:var(--azul-noite);color:#fff;border-color:var(--azul-noite)}
+
+  /* login */
+  .login{max-width:380px;margin:8vh auto;text-align:center}
+  .login img{height:96px;margin:0 auto 18px}
+  .login .card{text-align:left}
+
+  /* catálogo */
+  .cat-panel{margin-bottom:18px}
+  .cat-panel > .head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .swatch{width:20px;height:20px;border-radius:6px;flex:none;border:1px solid #0002}
+  .sec{border:1px solid var(--linha);border-radius:12px;padding:14px;margin-top:12px;background:#fbfbfe}
+  .sec > .shead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .items{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px}
+  .item .thumb{width:52px;height:52px;border-radius:8px;background:#eef;flex:none;object-fit:cover;display:flex;align-items:center;justify-content:center;color:var(--suave);font-size:.6rem;text-align:center}
+  .item .grow{flex:1;min-width:120px}
+  .addrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .addrow input[type=text]{flex:1;min-width:140px}
+  .pill{font-size:.72rem;font-family:var(--ff-d);padding:2px 9px;border-radius:999px;background:#eef;color:var(--suave)}
+  .hide{display:none}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--azul-noite);color:#fff;
+    padding:12px 20px;border-radius:999px;font-family:var(--ff-d);font-size:.9rem;opacity:0;transition:opacity .3s;z-index:50;pointer-events:none}
+  .toast.show{opacity:1}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--linha)}
+  th{font-family:var(--ff-d);font-weight:500;color:var(--suave);font-size:.8rem}
+  .warn{background:#fff8ea;border:1px solid var(--amarelo);color:#8a6d1f;border-radius:12px;padding:12px 16px;font-size:.85rem;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<div id="app"><div class="wrap" style="padding:40px 20px" id="boot">Carregando…</div></div>
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  "use strict";
+  var CFG = window.CASA_CONFIG || {};
+  var PALETTE = window.CASA_PALETTE || [];
+  var app = document.getElementById("app");
+  var db = null;
+
+  if(!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY){
+    app.innerHTML = '<div class="wrap" style="padding:48px 20px">'
+      + '<div class="warn">O portal ainda não está conectado ao banco. Abra <b>config.js</b> e preencha <b>SUPABASE_URL</b> e <b>SUPABASE_ANON_KEY</b> (passo a passo no arquivo SETUP.md).</div>'
+      + '<p class="muted">Depois de preencher, recarregue esta página.</p></div>';
+    return;
+  }
+  db = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+
+  /* ---------- helpers ---------- */
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function toast(m){ var t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
+    clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove("show");},2200); }
+  function slugify(s){ return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40) || ("cat-"+Date.now()); }
+  function colorOptions(cur){ return PALETTE.map(function(p){
+    return '<option value="'+p.hex+'"'+(p.hex===cur?" selected":"")+'>'+esc(p.name)+'</option>'; }).join(""); }
+  var val = function(id){ var e=document.getElementById(id); return e?e.value.trim():""; };
+
+  /* ---------- estado ---------- */
+  var state = {cats:[], sections:[], items:[], settings:{}, tab:"catalogo"};
+
+  async function loadAll(){
+    var c = await db.from("categories").select("*").order("position");
+    var s = await db.from("sections").select("*").order("position");
+    var i = await db.from("items").select("*").order("position");
+    var st = await db.from("settings").select("*").eq("id",1).maybeSingle();
+    state.cats = c.data||[]; state.sections = s.data||[]; state.items = i.data||[];
+    state.settings = (st&&st.data)||{};
+  }
+  function secsOf(catId){ return state.sections.filter(function(x){return x.category_id===catId;}); }
+  function itemsOf(secId){ return state.items.filter(function(x){return x.section_id===secId;}); }
+
+  /* ============================ AUTH ============================ */
+  async function boot(){
+    var ses = await db.auth.getSession();
+    if(ses.data.session){ await enter(); } else { renderLogin(); }
+  }
+  function renderLogin(){
+    app.innerHTML =
+      '<div class="login">'
+      + '<img src="logo-color.png" alt="Casa Lúdica" />'
+      + '<div class="card">'
+      + '<h2 style="margin-bottom:4px">Portal do Admin</h2>'
+      + '<p class="muted" style="margin:0 0 16px">Entre para gerenciar o catálogo.</p>'
+      + '<div style="margin-bottom:12px"><label>E-mail</label><input id="lg-email" type="email" autocomplete="username" /></div>'
+      + '<div style="margin-bottom:16px"><label>Senha</label><input id="lg-pass" type="password" autocomplete="current-password" /></div>'
+      + '<button class="btn" style="width:100%" id="lg-btn">Entrar</button>'
+      + '<p id="lg-err" class="muted" style="color:var(--vermelho);margin:12px 0 0"></p>'
+      + '</div>'
+      + '<p class="muted" style="margin-top:16px"><a href="index.html">← Ver o site</a></p>'
+      + '</div>';
+    document.getElementById("lg-btn").onclick = doLogin;
+    document.getElementById("lg-pass").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+  }
+  async function doLogin(){
+    var err = document.getElementById("lg-err"); err.textContent="";
+    var r = await db.auth.signInWithPassword({email:val("lg-email"), password:val("lg-pass")});
+    if(r.error){ err.textContent = "Não foi possível entrar. Verifique e-mail e senha."; return; }
+    await enter();
+  }
+  async function logout(){ await db.auth.signOut(); renderLogin(); }
+
+  async function enter(){
+    app.innerHTML = '<div class="wrap" style="padding:40px 20px">Carregando dados…</div>';
+    await loadAll();
+    renderShell();
+  }
+
+  /* ============================ SHELL ============================ */
+  function renderShell(){
+    app.innerHTML =
+      '<header class="top"><div class="wrap">'
+      + '<img src="logo-color.png" alt="Casa Lúdica" />'
+      + '<div class="row"><a class="btn ghost sm" href="index.html" target="_blank">Ver site ↗</a>'
+      + '<button class="btn ghost sm" id="btn-logout">Sair</button></div>'
+      + '</div></header>'
+      + '<div class="wrap" style="padding:8px 20px 60px">'
+      + '<div class="tabs">'
+      +   '<button data-tab="catalogo">Catálogo</button>'
+      +   '<button data-tab="config">Configurações</button>'
+      +   '<button data-tab="leads">Leads</button>'
+      + '</div>'
+      + '<div id="tabc"></div></div>';
+    document.getElementById("btn-logout").onclick = logout;
+    Array.prototype.forEach.call(app.querySelectorAll(".tabs button"), function(b){
+      b.onclick = function(){ state.tab = b.dataset.tab; paintTabs(); renderTab(); };
+    });
+    paintTabs(); renderTab();
+  }
+  function paintTabs(){ Array.prototype.forEach.call(app.querySelectorAll(".tabs button"), function(b){
+    b.classList.toggle("on", b.dataset.tab===state.tab); }); }
+  function renderTab(){
+    if(state.tab==="catalogo") renderCatalogo();
+    else if(state.tab==="config") renderConfig();
+    else renderLeads();
+  }
+  async function refresh(){ await loadAll(); renderTab(); }
+
+  /* ============================ CATÁLOGO ============================ */
+  function renderCatalogo(){
+    var c = document.getElementById("tabc");
+    var html = '<p class="muted" style="margin:0 0 14px">Até 3 categorias. Cada categoria tem seções, e cada seção tem itens (título + foto).</p>';
+    state.cats.forEach(function(cat, ci){ html += catPanel(cat, ci); });
+    if(state.cats.length < 3){
+      html += '<button class="btn g" id="add-cat">+ Adicionar categoria</button>';
+    }
+    c.innerHTML = html;
+    if(document.getElementById("add-cat")) document.getElementById("add-cat").onclick = addCategory;
+    bindCatalogo();
+  }
+
+  function catPanel(cat, ci){
+    var secs = secsOf(cat.id);
+    var h = '<div class="card cat-panel" data-cat="'+cat.id+'">'
+      + '<div class="head"><span class="swatch" style="background:'+esc(cat.color)+'"></span>'
+      +   '<h3 style="flex:1">'+esc(cat.name||"(sem nome)")+'</h3>'
+      +   '<span class="pill">Categoria '+(ci+1)+'</span>'
+      +   '<button class="icobtn" data-act="cat-up" data-id="'+cat.id+'" title="Subir">↑</button>'
+      +   '<button class="icobtn" data-act="cat-down" data-id="'+cat.id+'" title="Descer">↓</button>'
+      + '</div>'
+      + '<div class="grid2">'
+      +   '<div><label>Nome</label><input type="text" id="cn-'+cat.id+'" value="'+esc(cat.name)+'" /></div>'
+      +   '<div><label>Cor</label><select id="cc-'+cat.id+'">'+colorOptions(cat.color)+'</select></div>'
+      + '</div>'
+      + '<div style="margin-top:10px"><label>Título do convite (CTA)</label><input type="text" id="ct-'+cat.id+'" value="'+esc(cat.cta_title)+'" /></div>'
+      + '<div style="margin-top:10px"><label>Texto do convite (CTA)</label><textarea id="cx-'+cat.id+'" rows="2">'+esc(cat.cta_text)+'</textarea></div>'
+      + '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="cat-save" data-id="'+cat.id+'">Salvar categoria</button>'
+      +   '<button class="btn r sm" data-act="cat-del" data-id="'+cat.id+'">Excluir categoria</button></div>';
+
+    secs.forEach(function(sec){ h += secBlock(sec); });
+    h += '<div class="addrow"><input type="text" id="ns-'+cat.id+'" placeholder="Nome da nova seção" />'
+       + '<button class="btn sm" data-act="sec-add" data-id="'+cat.id+'">+ Adicionar seção</button></div>';
+    h += '</div>';
+    return h;
+  }
+
+  function secBlock(sec){
+    var its = itemsOf(sec.id);
+    var h = '<div class="sec" data-sec="'+sec.id+'">'
+      + '<div class="shead"><span class="swatch" style="background:'+esc(sec.color||"#ccc")+'"></span>'
+      +   '<input type="text" class="grow" id="sn-'+sec.id+'" value="'+esc(sec.name)+'" data-act="sec-save" data-id="'+sec.id+'" />'
+      +   '<select id="sc-'+sec.id+'" data-act="sec-save" data-id="'+sec.id+'" style="width:auto">'+colorOptions(sec.color)+'</select>'
+      +   '<button class="icobtn" data-act="sec-up" data-id="'+sec.id+'" title="Subir">↑</button>'
+      +   '<button class="icobtn" data-act="sec-down" data-id="'+sec.id+'" title="Descer">↓</button>'
+      +   '<button class="icobtn" data-act="sec-del" data-id="'+sec.id+'" title="Excluir seção">✕</button>'
+      + '</div><div class="items">';
+    its.forEach(function(it){ h += itemRow(it); });
+    h += '</div>'
+      + '<div class="addrow"><input type="text" id="ni-'+sec.id+'" placeholder="Título do novo item" />'
+      +   '<input type="file" id="nf-'+sec.id+'" accept="image/*" />'
+      +   '<button class="btn sm" data-act="item-add" data-id="'+sec.id+'">+ Adicionar item</button></div>'
+      + '</div>';
+    return h;
+  }
+
+  function itemRow(it){
+    var thumb = it.image_url
+      ? '<img class="thumb" src="'+esc(it.image_url)+'" alt="" />'
+      : '<div class="thumb">sem foto</div>';
+    return '<div class="item" data-item="'+it.id+'">'
+      + thumb
+      + '<input type="text" class="grow" id="it-'+it.id+'" value="'+esc(it.title)+'" data-act="item-title" data-id="'+it.id+'" />'
+      + '<label class="muted" style="display:flex;align-items:center;gap:5px;margin:0;font-family:var(--ff-t)">'
+      +   '<input type="checkbox" data-act="item-active" data-id="'+it.id+'" '+(it.active?"checked":"")+' style="width:auto" /> ativo</label>'
+      + '<label class="btn ghost sm" style="margin:0;position:relative;overflow:hidden">trocar foto'
+      +   '<input type="file" accept="image/*" data-act="item-img" data-id="'+it.id+'" style="position:absolute;inset:0;opacity:0;cursor:pointer" /></label>'
+      + '<button class="icobtn" data-act="item-up" data-id="'+it.id+'" title="Subir">↑</button>'
+      + '<button class="icobtn" data-act="item-down" data-id="'+it.id+'" title="Descer">↓</button>'
+      + '<button class="icobtn" data-act="item-del" data-id="'+it.id+'" title="Excluir">✕</button>'
+      + '</div>';
+  }
+
+  function bindCatalogo(){
+    var c = document.getElementById("tabc");
+    c.onclick = function(e){
+      var b = e.target.closest("[data-act]"); if(!b) return;
+      var act=b.dataset.act, id=b.dataset.id;
+      if(act==="cat-save") return saveCategory(id);
+      if(act==="cat-del") return deleteCategory(id);
+      if(act==="cat-up") return moveRow("categories", state.cats, id, -1);
+      if(act==="cat-down") return moveRow("categories", state.cats, id, 1);
+      if(act==="sec-add") return addSection(id);
+      if(act==="sec-del") return deleteSection(id);
+      if(act==="sec-up") return moveRow("sections", secsOf(parentCatOfSec(id)), id, -1);
+      if(act==="sec-down") return moveRow("sections", secsOf(parentCatOfSec(id)), id, 1);
+      if(act==="item-add") return addItem(id);
+      if(act==="item-del") return deleteItem(id);
+      if(act==="item-up") return moveRow("items", itemsOf(parentSecOfItem(id)), id, -1);
+      if(act==="item-down") return moveRow("items", itemsOf(parentSecOfItem(id)), id, 1);
+    };
+    c.onchange = function(e){
+      var b = e.target.closest("[data-act]"); if(!b) return;
+      var act=b.dataset.act, id=b.dataset.id;
+      if(act==="sec-save") return saveSection(id);
+      if(act==="item-title") return saveItemTitle(id);
+      if(act==="item-active") return toggleItem(id, b.checked);
+      if(act==="item-img") return uploadItemImage(id, b.files[0]);
+    };
+  }
+  function parentCatOfSec(secId){ var s=state.sections.find(function(x){return x.id===secId;}); return s?s.category_id:null; }
+  function parentSecOfItem(itemId){ var i=state.items.find(function(x){return x.id===itemId;}); return i?i.section_id:null; }
+
+  /* ----- mutations: categorias ----- */
+  async function addCategory(){
+    if(state.cats.length>=3){ toast("Máximo de 3 categorias."); return; }
+    var name = "Nova categoria";
+    var r = await db.from("categories").insert({name:name, slug:slugify(name+"-"+Date.now()),
+      color: (PALETTE[state.cats.length]||PALETTE[0]).hex, position: state.cats.length}).select().single();
+    if(r.error){ toast("Erro ao criar categoria."); return; }
+    await refresh(); toast("Categoria criada.");
+  }
+  async function saveCategory(id){
+    var name = val("cn-"+id);
+    var upd = { name:name, color: val("cc-"+id), cta_title: val("ct-"+id), cta_text: val("cx-"+id) };
+    var cat = state.cats.find(function(x){return x.id===id;});
+    if(cat && !cat.slug){ upd.slug = slugify(name); }
+    var r = await db.from("categories").update(upd).eq("id", id);
+    if(r.error){ toast("Erro ao salvar."); return; }
+    await refresh(); toast("Categoria salva.");
+  }
+  async function deleteCategory(id){
+    if(!confirm("Excluir esta categoria e todas as suas seções e itens?")) return;
+    var r = await db.from("categories").delete().eq("id", id);
+    if(r.error){ toast("Erro ao excluir."); return; }
+    await refresh(); toast("Categoria excluída.");
+  }
+
+  /* ----- seções ----- */
+  async function addSection(catId){
+    var name = val("ns-"+catId) || "Nova seção";
+    var count = secsOf(catId).length;
+    var r = await db.from("sections").insert({category_id:catId, name:name,
+      color:(state.cats.find(function(x){return x.id===catId;})||{}).color || "#109E63", position:count});
+    if(r.error){ toast("Erro ao criar seção."); return; }
+    await refresh(); toast("Seção criada.");
+  }
+  async function saveSection(id){
+    var r = await db.from("sections").update({name:val("sn-"+id), color:val("sc-"+id)}).eq("id", id);
+    if(r.error){ toast("Erro ao salvar seção."); return; }
+    await loadAll(); toast("Seção salva.");
+  }
+  async function deleteSection(id){
+    if(!confirm("Excluir esta seção e seus itens?")) return;
+    var r = await db.from("sections").delete().eq("id", id);
+    if(r.error){ toast("Erro ao excluir seção."); return; }
+    await refresh(); toast("Seção excluída.");
+  }
+
+  /* ----- itens ----- */
+  async function addItem(secId){
+    var title = val("ni-"+secId) || "Novo item";
+    var fileInput = document.getElementById("nf-"+secId);
+    var file = fileInput && fileInput.files[0];
+    var url = "";
+    if(file){ url = await uploadImage(file); if(url===null){ return; } }
+    var count = itemsOf(secId).length;
+    var r = await db.from("items").insert({section_id:secId, title:title, image_url:url||null,
+      position:count, active:true});
+    if(r.error){ toast("Erro ao criar item."); return; }
+    await refresh(); toast("Item adicionado.");
+  }
+  async function saveItemTitle(id){
+    var r = await db.from("items").update({title: val("it-"+id)}).eq("id", id);
+    if(r.error){ toast("Erro ao salvar item."); return; }
+    var it = state.items.find(function(x){return x.id===id;}); if(it) it.title = val("it-"+id);
+    toast("Item salvo.");
+  }
+  async function toggleItem(id, active){
+    var r = await db.from("items").update({active: !!active}).eq("id", id);
+    if(r.error){ toast("Erro ao atualizar."); return; }
+    var it = state.items.find(function(x){return x.id===id;}); if(it) it.active = !!active;
+    toast(active?"Item ativado.":"Item ocultado.");
+  }
+  async function uploadItemImage(id, file){
+    if(!file) return;
+    var url = await uploadImage(file); if(url===null) return;
+    var r = await db.from("items").update({image_url:url}).eq("id", id);
+    if(r.error){ toast("Erro ao salvar foto."); return; }
+    await refresh(); toast("Foto atualizada.");
+  }
+  async function deleteItem(id){
+    if(!confirm("Excluir este item?")) return;
+    var r = await db.from("items").delete().eq("id", id);
+    if(r.error){ toast("Erro ao excluir item."); return; }
+    await refresh(); toast("Item excluído.");
+  }
+
+  async function uploadImage(file){
+    try{
+      var ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+      var path = "items/"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+ext;
+      var up = await db.storage.from("catalog").upload(path, file, {cacheControl:"3600", upsert:false});
+      if(up.error) throw up.error;
+      var pub = db.storage.from("catalog").getPublicUrl(path);
+      return pub.data.publicUrl;
+    }catch(e){ console.warn(e); toast("Falha no upload da imagem."); return null; }
+  }
+
+  /* ----- reordenação genérica ----- */
+  async function moveRow(table, list, id, dir){
+    var arr = list.slice();
+    var i = arr.findIndex(function(x){return x.id===id;});
+    var j = i+dir; if(i<0 || j<0 || j>=arr.length) return;
+    var tmp = arr[i]; arr[i]=arr[j]; arr[j]=tmp;
+    for(var k=0;k<arr.length;k++){ await db.from(table).update({position:k}).eq("id", arr[k].id); }
+    await refresh();
+  }
+
+  /* ============================ CONFIGURAÇÕES ============================ */
+  function renderConfig(){
+    var s = state.settings || {};
+    document.getElementById("tabc").innerHTML =
+      '<div class="card"><h3 style="margin-bottom:14px">Configurações do site</h3>'
+      + '<div class="grid2">'
+      +   '<div><label>Instagram (URL)</label><input type="text" id="s-ig" value="'+esc(s.instagram_url)+'" /></div>'
+      +   '<div><label>WhatsApp (URL)</label><input type="text" id="s-wa" value="'+esc(s.whatsapp_url)+'" /></div>'
+      + '</div>'
+      + '<div style="margin-top:12px"><label>Título do hero</label><input type="text" id="s-ht" value="'+esc(s.hero_title)+'" /></div>'
+      + '<div style="margin-top:12px"><label>Slogan do hero</label><input type="text" id="s-hs" value="'+esc(s.hero_slogan)+'" /></div>'
+      + '<div style="margin-top:12px"><label>Texto do hero</label><textarea id="s-hl" rows="2">'+esc(s.hero_lead)+'</textarea></div>'
+      + '<p class="muted" style="margin-top:10px">Dica do WhatsApp: use o formato <b>https://wa.me/55DDDNUMERO</b> (só números).</p>'
+      + '<button class="btn g" style="margin-top:12px" id="s-save">Salvar configurações</button>'
+      + '</div>';
+    document.getElementById("s-save").onclick = saveSettings;
+  }
+  async function saveSettings(){
+    var r = await db.from("settings").update({
+      instagram_url:val("s-ig"), whatsapp_url:val("s-wa"),
+      hero_title:val("s-ht"), hero_slogan:val("s-hs"), hero_lead:val("s-hl"), updated_at:new Date().toISOString()
+    }).eq("id",1);
+    if(r.error){ toast("Erro ao salvar."); return; }
+    await loadAll(); toast("Configurações salvas.");
+  }
+
+  /* ============================ LEADS ============================ */
+  async function renderLeads(){
+    var c = document.getElementById("tabc");
+    c.innerHTML = '<div class="card">Carregando leads…</div>';
+    var r = await db.from("leads").select("*").order("created_at",{ascending:false});
+    if(r.error){ c.innerHTML = '<div class="card">Erro ao carregar leads.</div>'; return; }
+    var leads = r.data||[];
+    var rows = leads.map(function(l){
+      var d = new Date(l.created_at);
+      return '<tr><td>'+esc(l.email)+'</td><td>'+esc(l.category||"")+'</td><td>'+d.toLocaleString("pt-BR")+'</td>'
+        + '<td style="text-align:right"><button class="icobtn" data-del="'+l.id+'" title="Excluir">✕</button></td></tr>';
+    }).join("");
+    c.innerHTML = '<div class="card">'
+      + '<div class="row" style="justify-content:space-between;margin-bottom:12px">'
+      +   '<h3>Leads capturados <span class="pill">'+leads.length+'</span></h3>'
+      +   (leads.length?'<button class="btn ghost sm" id="lead-csv">Exportar CSV</button>':'')
+      + '</div>'
+      + (leads.length
+          ? '<table><thead><tr><th>E-mail</th><th>Categoria</th><th>Data</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'
+          : '<p class="muted">Nenhum lead ainda. Quando alguém preencher o formulário no site, aparece aqui.</p>')
+      + '</div>';
+    if(document.getElementById("lead-csv")) document.getElementById("lead-csv").onclick = function(){ exportCSV(leads); };
+    c.querySelectorAll("[data-del]").forEach(function(b){
+      b.onclick = async function(){ if(!confirm("Excluir este lead?")) return;
+        await db.from("leads").delete().eq("id", b.dataset.del); renderLeads(); };
+    });
+  }
+  function exportCSV(leads){
+    var lines = [["email","categoria","data"].join(",")].concat(leads.map(function(l){
+      return ['"'+(l.email||"").replace(/"/g,'""')+'"','"'+(l.category||"").replace(/"/g,'""')+'"','"'+l.created_at+'"'].join(",");
+    }));
+    var blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "leads-casa-ludica.csv"; a.click();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
