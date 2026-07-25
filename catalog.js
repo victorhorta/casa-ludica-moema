@@ -19,6 +19,7 @@
   var CHECK = '<svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg>';
   var PH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-6 6"/></svg>';
   var ZOOM = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/><path d="M11 8.2v5.6M8.2 11h5.6"/></svg>';
+  var CHEV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   var PENCIL = '<span class="pencil"><span class="lead-tip"></span><span class="body"></span><span class="tip"></span></span>';
   function roof(color){
     return '<div class="roofwrap"><svg class="roof" viewBox="0 0 300 90" style="--c:'+color+'" aria-hidden="true">'
@@ -65,14 +66,18 @@
     return '<div class="card reveal" style="--i:'+idx+'" data-cat="'+esc(catName||"")+'" data-sec="'+esc(secName||"")+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4>'+desc+'</div></div>';
   }
 
-  function sectionHTML(sec, catColor, catName){
+  function sectionHTML(sec, catColor, catName, bodyId){
     var color = sec.color || catColor;
     var items = sec.items || [];
     var cards = items.map(function(it,ix){ return cardHTML(it, color, ix, catName, sec.name); }).join("");
     var count = items.length ? (items.length + (items.length===1?" item":" itens")) : "";
     return '<div class="cat-section" style="--sc:'+color+'">'
-      + '<div class="s-head reveal"><span class="sq"></span><h3>'+esc(sec.name)+'</h3><span class="count">'+count+'</span></div>'
-      + '<div class="grid">'+cards+'</div></div>';
+      + '<button type="button" class="s-head reveal" aria-expanded="true" aria-controls="'+bodyId+'">'
+      +   '<span class="sq"></span><h3>'+esc(sec.name)+'</h3><span class="count">'+count+'</span>'
+      +   '<span class="chev" aria-hidden="true">'+CHEV+'</span>'
+      + '</button>'
+      + '<div class="s-body" id="'+bodyId+'"><div class="s-body-inner"><div class="grid">'+cards+'</div></div></div>'
+      + '</div>';
   }
 
   function ctaHTML(cat, settings){
@@ -91,7 +96,9 @@
   }
 
   function categoryHTML(cat, idx, settings){
-    var secs = (cat.sections || []).map(function(s){ return sectionHTML(s, cat.color, cat.name); }).join("");
+    var secs = (cat.sections || []).map(function(s, six){
+      return sectionHTML(s, cat.color, cat.name, "secbody-"+esc(cat.slug)+"-"+six);
+    }).join("");
     return roof(cat.color)
       + '<section class="cat" id="'+esc(cat.slug)+'" style="--c:'+cat.color+'">'
       + '<div class="cat-head">'
@@ -142,6 +149,7 @@
     wireLeads();
     initMotion();
     initZoom();
+    initAccordion();
   }
 
   /* ---------- lightbox (ampliar imagem do produto) ---------- */
@@ -272,6 +280,18 @@
     });
   }
 
+  /* ---------- seções colapsáveis (sanfona) ---------- */
+  function initAccordion(){
+    var root = document.getElementById("catalog-root");
+    if(!root || root.__accWired) return; root.__accWired = true;
+    root.addEventListener("click", function(e){
+      var head = e.target.closest(".s-head");
+      if(!head || !root.contains(head)) return;
+      var open = head.getAttribute("aria-expanded") !== "false";
+      head.setAttribute("aria-expanded", open ? "false" : "true");
+    });
+  }
+
   /* ---------- formulário de leads ---------- */
   function wireLeads(){
     document.querySelectorAll(".cta-form").forEach(function(form){
@@ -300,7 +320,7 @@
   function initMotion(){
     var revObs = new IntersectionObserver(function(entries){
       entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add("in"); revObs.unobserve(en.target); } });
-    }, {threshold:.12, rootMargin:"0px 0px -8% 0px"});
+    }, {threshold:.05, rootMargin:"0px 0px -4% 0px"});
     document.querySelectorAll(".reveal, .roof").forEach(function(el){ revObs.observe(el); });
 
     var links = Array.prototype.slice.call(document.querySelectorAll(".spy a"));
