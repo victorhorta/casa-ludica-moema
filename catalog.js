@@ -18,6 +18,7 @@
   var ARROW = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   var CHECK = '<svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg>';
   var PH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-6 6"/></svg>';
+  var ZOOM = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/><path d="M11 8.2v5.6M8.2 11h5.6"/></svg>';
   var PENCIL = '<span class="pencil"><span class="lead-tip"></span><span class="body"></span><span class="tip"></span></span>';
   function roof(color){
     return '<div class="roofwrap"><svg class="roof" viewBox="0 0 300 90" style="--c:'+color+'" aria-hidden="true">'
@@ -58,7 +59,7 @@
   /* ---------- render ---------- */
   function cardHTML(item, color, idx){
     var media = item.image_url
-      ? '<div class="thumb" style="padding:0"><img src="'+esc(item.image_url)+'" alt="'+esc(item.title)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover"/></div>'
+      ? '<div class="thumb zoom" style="padding:0" role="button" tabindex="0" aria-label="Ampliar imagem: '+esc(item.title)+'"><img src="'+esc(item.image_url)+'" alt="'+esc(item.title)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover"/><span class="zoom-badge" aria-hidden="true">'+ZOOM+'</span></div>'
       : '<div class="thumb"><div class="ph">'+PH+'<span>foto do produto</span></div></div>';
     var desc = item.description ? '<p class="cap-desc">'+esc(item.description)+'</p>' : '';
     return '<div class="card reveal" style="--i:'+idx+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4>'+desc+'</div></div>';
@@ -140,6 +141,94 @@
 
     wireLeads();
     initMotion();
+    initZoom();
+  }
+
+  /* ---------- lightbox (ampliar imagem do produto) ---------- */
+  var lbBuilt = false;
+  function buildLightbox(){
+    if(lbBuilt) return; lbBuilt = true;
+    var css = ""
+      + ".thumb.zoom{cursor:zoom-in}"
+      + ".thumb.zoom .zoom-badge{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(55,58,129,.18);opacity:0;transform:scale(.8);transition:opacity .2s ease,transform .2s ease;pointer-events:none}"
+      + ".thumb.zoom .zoom-badge svg{width:17px;height:17px;stroke:var(--azul-noite,#373A81);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}"
+      + ".card:hover .thumb.zoom .zoom-badge,.thumb.zoom:focus-visible .zoom-badge{opacity:1;transform:scale(1)}"
+      + ".thumb.zoom:focus-visible{outline:3px solid var(--azul-noite,#373A81);outline-offset:2px}"
+      + ".lb{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:24px}"
+      + ".lb.open{display:flex}"
+      + ".lb-backdrop{position:absolute;inset:0;background:rgba(31,33,74,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:lbfade .25s ease}"
+      + ".lb-panel{position:relative;z-index:1;background:#fff;border-radius:var(--r-card,20px);width:auto;max-width:min(92vw,860px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(31,33,74,.45);animation:lbpop .28s cubic-bezier(.2,.8,.3,1)}"
+      + ".lb-imgwrap{background:#f4f5fb;display:flex;align-items:center;justify-content:center;padding:22px;min-height:0}"
+      + ".lb-img{max-width:100%;max-height:64vh;width:auto;height:auto;object-fit:contain;display:block;border-radius:10px}"
+      + ".lb-cap{padding:16px 22px 22px;border-top:1px solid #eef0f7}"
+      + ".lb-cap h4{font-family:var(--ff-display);font-weight:500;font-size:1.18rem;color:var(--azul-noite,#373A81);margin:0}"
+      + ".lb-cap p{margin:6px 0 0;font-size:.92rem;line-height:1.45;color:var(--tinta-suave,#5b5f77)}"
+      + ".lb-cap p:empty{display:none}"
+      + ".lb-close{position:absolute;top:12px;right:12px;z-index:2;width:38px;height:38px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--azul-noite,#373A81);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(31,33,74,.25);transition:transform .15s ease,background .15s ease}"
+      + ".lb-close:hover{transform:scale(1.08);background:#fff}"
+      + "body.lb-lock{overflow:hidden}"
+      + "@keyframes lbfade{from{opacity:0}to{opacity:1}}"
+      + "@keyframes lbpop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}"
+      + "@media(max-width:520px){.lb-img{max-height:56vh}.lb-panel{max-width:94vw}.lb-imgwrap{padding:14px}}"
+      + "@media(prefers-reduced-motion:reduce){.lb-backdrop,.lb-panel{animation:none}}";
+    var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+
+    var lb = document.createElement("div");
+    lb.className = "lb"; lb.id = "lightbox";
+    lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true");
+    lb.setAttribute("aria-hidden","true"); lb.setAttribute("aria-label","Imagem ampliada do produto");
+    lb.innerHTML = '<div class="lb-backdrop" data-close></div>'
+      + '<div class="lb-panel">'
+      +   '<button class="lb-close" data-close aria-label="Fechar">×</button>'
+      +   '<div class="lb-imgwrap"><img class="lb-img" alt=""/></div>'
+      +   '<div class="lb-cap"><h4 class="lb-title"></h4><p class="lb-desc"></p></div>'
+      + '</div>';
+    document.body.appendChild(lb);
+
+    var img = lb.querySelector(".lb-img"),
+        tt  = lb.querySelector(".lb-title"),
+        dd  = lb.querySelector(".lb-desc"),
+        lastFocus = null;
+    function open(src, title, desc){
+      img.src = src; img.alt = title || "";
+      tt.textContent = title || ""; dd.textContent = desc || "";
+      lastFocus = document.activeElement;
+      lb.classList.add("open"); lb.setAttribute("aria-hidden","false");
+      document.body.classList.add("lb-lock");
+      lb.querySelector(".lb-close").focus();
+    }
+    function close(){
+      lb.classList.remove("open"); lb.setAttribute("aria-hidden","true");
+      document.body.classList.remove("lb-lock");
+      img.removeAttribute("src");
+      if(lastFocus && lastFocus.focus){ lastFocus.focus(); }
+    }
+    lb.addEventListener("click", function(e){ if(e.target.hasAttribute("data-close")) close(); });
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape" && lb.classList.contains("open")) close();
+    });
+    window.__casaLbOpen = open;
+  }
+
+  function initZoom(){
+    buildLightbox();
+    var root = document.getElementById("catalog-root");
+    if(!root || root.__zoomWired) return; root.__zoomWired = true;
+    function openFromThumb(thumb){
+      var im = thumb.querySelector("img"); if(!im) return;
+      var card = thumb.closest(".card");
+      var h = card ? card.querySelector("h4") : null;
+      var d = card ? card.querySelector(".cap-desc") : null;
+      window.__casaLbOpen(im.currentSrc || im.src, h ? h.textContent : "", d ? d.textContent : "");
+    }
+    root.addEventListener("click", function(e){
+      var thumb = e.target.closest(".thumb.zoom"); if(thumb) openFromThumb(thumb);
+    });
+    root.addEventListener("keydown", function(e){
+      if(e.key !== "Enter" && e.key !== " ") return;
+      var thumb = e.target.closest(".thumb.zoom"); if(!thumb) return;
+      e.preventDefault(); openFromThumb(thumb);
+    });
   }
 
   /* ---------- formulário de leads ---------- */
