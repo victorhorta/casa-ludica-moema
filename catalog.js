@@ -57,18 +57,18 @@
   }
 
   /* ---------- render ---------- */
-  function cardHTML(item, color, idx){
+  function cardHTML(item, color, idx, catName, secName){
     var media = item.image_url
       ? '<div class="thumb zoom" style="padding:0" role="button" tabindex="0" aria-label="Ampliar imagem: '+esc(item.title)+'"><img src="'+esc(item.image_url)+'" alt="'+esc(item.title)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover"/><span class="zoom-badge" aria-hidden="true">'+ZOOM+'</span></div>'
       : '<div class="thumb"><div class="ph">'+PH+'<span>foto do produto</span></div></div>';
     var desc = item.description ? '<p class="cap-desc">'+esc(item.description)+'</p>' : '';
-    return '<div class="card reveal" style="--i:'+idx+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4>'+desc+'</div></div>';
+    return '<div class="card reveal" style="--i:'+idx+'" data-cat="'+esc(catName||"")+'" data-sec="'+esc(secName||"")+'">'+media+'<div class="cap"><h4>'+esc(item.title)+'</h4>'+desc+'</div></div>';
   }
 
-  function sectionHTML(sec, catColor){
+  function sectionHTML(sec, catColor, catName){
     var color = sec.color || catColor;
     var items = sec.items || [];
-    var cards = items.map(function(it,ix){ return cardHTML(it, color, ix); }).join("");
+    var cards = items.map(function(it,ix){ return cardHTML(it, color, ix, catName, sec.name); }).join("");
     var count = items.length ? (items.length + (items.length===1?" item":" itens")) : "";
     return '<div class="cat-section" style="--sc:'+color+'">'
       + '<div class="s-head reveal"><span class="sq"></span><h3>'+esc(sec.name)+'</h3><span class="count">'+count+'</span></div>'
@@ -91,7 +91,7 @@
   }
 
   function categoryHTML(cat, idx, settings){
-    var secs = (cat.sections || []).map(function(s){ return sectionHTML(s, cat.color); }).join("");
+    var secs = (cat.sections || []).map(function(s){ return sectionHTML(s, cat.color, cat.name); }).join("");
     return roof(cat.color)
       + '<section class="cat" id="'+esc(cat.slug)+'" style="--c:'+cat.color+'">'
       + '<div class="cat-head">'
@@ -145,6 +145,20 @@
   }
 
   /* ---------- lightbox (ampliar imagem do produto) ---------- */
+  function dataFromThumb(th){
+    var im = th.querySelector("img");
+    var card = th.closest(".card");
+    var h = card ? card.querySelector("h4") : null;
+    var d = card ? card.querySelector(".cap-desc") : null;
+    return {
+      src: im ? (im.getAttribute("src") || im.src) : "",
+      title: h ? h.textContent : "",
+      desc: d ? d.textContent : "",
+      cat: card ? (card.getAttribute("data-cat") || "") : "",
+      sec: card ? (card.getAttribute("data-sec") || "") : ""
+    };
+  }
+
   var lbBuilt = false;
   function buildLightbox(){
     if(lbBuilt) return; lbBuilt = true;
@@ -158,18 +172,23 @@
       + ".lb.open{display:flex}"
       + ".lb-backdrop{position:absolute;inset:0;background:rgba(31,33,74,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:lbfade .25s ease}"
       + ".lb-panel{position:relative;z-index:1;background:#fff;border-radius:var(--r-card,20px);width:auto;max-width:min(92vw,860px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(31,33,74,.45);animation:lbpop .28s cubic-bezier(.2,.8,.3,1)}"
-      + ".lb-imgwrap{background:#f4f5fb;display:flex;align-items:center;justify-content:center;padding:22px;min-height:0}"
+      + ".lb-imgwrap{position:relative;background:#f4f5fb;display:flex;align-items:center;justify-content:center;padding:22px;min-height:0}"
       + ".lb-img{max-width:100%;max-height:64vh;width:auto;height:auto;object-fit:contain;display:block;border-radius:10px}"
       + ".lb-cap{padding:16px 22px 22px;border-top:1px solid #eef0f7}"
+      + ".lb-meta{display:block;font-family:var(--ff-display);font-weight:600;font-size:.7rem;letter-spacing:.6px;text-transform:uppercase;color:#9096ad;margin-bottom:5px}"
+      + ".lb-meta:empty{display:none}"
       + ".lb-cap h4{font-family:var(--ff-display);font-weight:500;font-size:1.18rem;color:var(--azul-noite,#373A81);margin:0}"
       + ".lb-cap p{margin:6px 0 0;font-size:.92rem;line-height:1.45;color:var(--tinta-suave,#5b5f77)}"
       + ".lb-cap p:empty{display:none}"
-      + ".lb-close{position:absolute;top:12px;right:12px;z-index:2;width:38px;height:38px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--azul-noite,#373A81);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(31,33,74,.25);transition:transform .15s ease,background .15s ease}"
+      + ".lb-close{position:absolute;top:12px;right:12px;z-index:3;width:38px;height:38px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--azul-noite,#373A81);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(31,33,74,.25);transition:transform .15s ease,background .15s ease}"
       + ".lb-close:hover{transform:scale(1.08);background:#fff}"
+      + ".lb-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:42px;height:42px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--azul-noite,#373A81);font-size:26px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(31,33,74,.25);transition:transform .15s ease,background .15s ease}"
+      + ".lb-nav:hover{background:#fff;transform:translateY(-50%) scale(1.08)}"
+      + ".lb-prev{left:12px}.lb-next{right:12px}"
       + "body.lb-lock{overflow:hidden}"
       + "@keyframes lbfade{from{opacity:0}to{opacity:1}}"
       + "@keyframes lbpop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}"
-      + "@media(max-width:520px){.lb-img{max-height:56vh}.lb-panel{max-width:94vw}.lb-imgwrap{padding:14px}}"
+      + "@media(max-width:520px){.lb-img{max-height:56vh}.lb-panel{max-width:94vw}.lb-imgwrap{padding:14px}.lb-nav{width:36px;height:36px;font-size:22px}.lb-prev{left:6px}.lb-next{right:6px}}"
       + "@media(prefers-reduced-motion:reduce){.lb-backdrop,.lb-panel{animation:none}}";
     var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -180,34 +199,58 @@
     lb.innerHTML = '<div class="lb-backdrop" data-close></div>'
       + '<div class="lb-panel">'
       +   '<button class="lb-close" data-close aria-label="Fechar">×</button>'
-      +   '<div class="lb-imgwrap"><img class="lb-img" alt=""/></div>'
-      +   '<div class="lb-cap"><h4 class="lb-title"></h4><p class="lb-desc"></p></div>'
+      +   '<div class="lb-imgwrap">'
+      +     '<button class="lb-nav lb-prev" aria-label="Item anterior">‹</button>'
+      +     '<img class="lb-img" alt=""/>'
+      +     '<button class="lb-nav lb-next" aria-label="Próximo item">›</button>'
+      +   '</div>'
+      +   '<div class="lb-cap"><span class="lb-meta"></span><h4 class="lb-title"></h4><p class="lb-desc"></p></div>'
       + '</div>';
     document.body.appendChild(lb);
 
-    var img = lb.querySelector(".lb-img"),
-        tt  = lb.querySelector(".lb-title"),
-        dd  = lb.querySelector(".lb-desc"),
-        lastFocus = null;
-    function open(src, title, desc){
-      img.src = src; img.alt = title || "";
-      tt.textContent = title || ""; dd.textContent = desc || "";
+    var img  = lb.querySelector(".lb-img"),
+        meta = lb.querySelector(".lb-meta"),
+        tt   = lb.querySelector(".lb-title"),
+        dd   = lb.querySelector(".lb-desc"),
+        prevBtn = lb.querySelector(".lb-prev"),
+        nextBtn = lb.querySelector(".lb-next"),
+        closeBtn = lb.querySelector(".lb-close"),
+        items = [], idx = 0, lastFocus = null;
+
+    function show(i){
+      if(!items.length) return;
+      idx = (i % items.length + items.length) % items.length;   /* wrap-around */
+      var d = dataFromThumb(items[idx]);
+      img.src = d.src; img.alt = d.title || "";
+      meta.textContent = (d.cat && d.sec) ? (d.cat + " › " + d.sec) : (d.cat || d.sec || "");
+      tt.textContent = d.title || ""; dd.textContent = d.desc || "";
+      var multi = items.length > 1;
+      prevBtn.style.display = nextBtn.style.display = multi ? "" : "none";
+    }
+    function openList(list, i){
+      items = list || [];
       lastFocus = document.activeElement;
       lb.classList.add("open"); lb.setAttribute("aria-hidden","false");
       document.body.classList.add("lb-lock");
-      lb.querySelector(".lb-close").focus();
+      show(i || 0);
+      closeBtn.focus();
     }
     function close(){
       lb.classList.remove("open"); lb.setAttribute("aria-hidden","true");
       document.body.classList.remove("lb-lock");
-      img.removeAttribute("src");
+      img.removeAttribute("src"); items = [];
       if(lastFocus && lastFocus.focus){ lastFocus.focus(); }
     }
+    prevBtn.addEventListener("click", function(){ show(idx - 1); });
+    nextBtn.addEventListener("click", function(){ show(idx + 1); });
     lb.addEventListener("click", function(e){ if(e.target.hasAttribute("data-close")) close(); });
     document.addEventListener("keydown", function(e){
-      if(e.key === "Escape" && lb.classList.contains("open")) close();
+      if(!lb.classList.contains("open")) return;
+      if(e.key === "Escape"){ close(); }
+      else if(e.key === "ArrowLeft"){ e.preventDefault(); show(idx - 1); }
+      else if(e.key === "ArrowRight"){ e.preventDefault(); show(idx + 1); }
     });
-    window.__casaLbOpen = open;
+    window.__casaLb = { openList: openList };
   }
 
   function initZoom(){
@@ -215,11 +258,9 @@
     var root = document.getElementById("catalog-root");
     if(!root || root.__zoomWired) return; root.__zoomWired = true;
     function openFromThumb(thumb){
-      var im = thumb.querySelector("img"); if(!im) return;
-      var card = thumb.closest(".card");
-      var h = card ? card.querySelector("h4") : null;
-      var d = card ? card.querySelector(".cap-desc") : null;
-      window.__casaLbOpen(im.currentSrc || im.src, h ? h.textContent : "", d ? d.textContent : "");
+      var all = Array.prototype.slice.call(root.querySelectorAll(".thumb.zoom"));
+      var i = all.indexOf(thumb); if(i < 0) i = 0;
+      window.__casaLb.openList(all, i);
     }
     root.addEventListener("click", function(e){
       var thumb = e.target.closest(".thumb.zoom"); if(thumb) openFromThumb(thumb);
@@ -272,6 +313,7 @@
             var on = a.getAttribute("href") === "#"+id;
             a.setAttribute("aria-current", on?"true":"false");
             a.style.background = on ? a.dataset.color : "transparent";
+            a.style.color = on ? "#fff" : a.dataset.color;
           });
         }
       });
