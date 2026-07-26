@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Casa Lúdica Moema — Catálogo</title>
-<meta name="description" content="Casa Lúdica Moema — brinquedos inteligentes para escolas, clínicas e espaços de brincar." />
+<meta name="description" content="Casa Lúdica Moema — catálogo B2B de mobiliário e brinquedos lúdicos sob encomenda para escolas, clínicas, buffets e espaços de brincar." />
 <script>document.documentElement.className='js';</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -86,6 +86,33 @@
     background:linear-gradient(90deg,var(--laranja),var(--rosa-amor),var(--azul-alegria));
     -webkit-background-clip:text; background-clip:text; color:transparent}
   .hero .lead{max-width:600px; margin:16px auto 0; color:var(--tinta-suave); font-size:1.06rem}
+
+  /* ---------- fluxo B2B: 3 passos ---------- */
+  .how{max-width:760px; margin:40px auto 0}
+  .how-kicker{font-family:var(--ff-display); font-weight:500; text-transform:lowercase; letter-spacing:2.5px;
+    font-size:.78rem; color:var(--tinta-suave)}
+  .how-title{font-size:clamp(1.3rem,3.4vw,1.7rem); color:var(--azul-noite); margin-top:6px}
+  .how-grid{display:grid; grid-template-columns:1fr 46px 1fr 46px 1fr; align-items:start; margin-top:30px}
+  .how-step{display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 8px}
+  .how-step .hs-num{width:44px; height:44px; border-radius:50%; background:var(--c); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-family:var(--ff-display); font-weight:600;
+    font-size:1.1rem; box-shadow:0 8px 18px color-mix(in srgb, var(--c) 45%, transparent); flex:none}
+  .how-step h3{font-size:1.02rem; color:var(--azul-noite); margin:14px 0 5px}
+  .how-step p{margin:0; font-size:.84rem; line-height:1.45; color:var(--tinta-suave)}
+  .how-arrow{align-self:center; margin-top:22px; color:var(--cinza-neutro)}
+  .how-arrow svg{width:100%; height:16px; stroke:currentColor; fill:none; stroke-width:2;
+    stroke-linecap:round; stroke-linejoin:round}
+  .how-cta{text-align:center; margin-top:32px}
+  .how-cta .btn-cta{display:inline-flex; align-items:center; gap:9px; background:var(--azul-noite); color:#fff;
+    padding:15px 30px; border-radius:999px; font-family:var(--ff-display); font-weight:600; font-size:1rem;
+    box-shadow:0 10px 24px rgba(55,58,129,.25); transition:transform .18s ease, box-shadow .18s ease}
+  .how-cta .btn-cta:hover{transform:translateY(-2px); box-shadow:0 14px 30px rgba(55,58,129,.32)}
+  .how-cta .btn-cta svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2.4;
+    stroke-linecap:round; stroke-linejoin:round}
+  @media(max-width:640px){
+    .how-grid{grid-template-columns:1fr; gap:24px}
+    .how-arrow{display:none}
+  }
 
   /* rooms / doors */
   .rooms{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:900px; margin:34px auto 8px}
@@ -275,12 +302,42 @@
   <span class="glow" aria-hidden="true"></span>
   <div class="wrap">
     <img class="hero-logo" src="logo-color.png" alt="Casa Lúdica Moema" />
-    <div class="eyebrow reveal">brinquedos inteligentes</div>
+    <div class="eyebrow reveal">catálogo b2b</div>
     <h1 class="reveal" style="--i:1">Casa Lúdica Moema</h1>
     <div class="slogan reveal" style="--i:2">Juntos por uma infância + lúdica</div>
-    <p class="lead reveal" style="--i:3">Ambientes que encantam e transformam a infância. Escolha um espaço e conheça nossas soluções em brinquedos e mobiliário lúdico.</p>
+    <p class="lead reveal" style="--i:3">Mobiliário e brinquedos lúdicos sob encomenda para escolas, clínicas, buffets e espaços de brincar. Monte o ambiente ideal para o seu negócio em 3 passos simples.</p>
 
-    <div class="cta hero-cta reveal" style="--i:4">
+    <div class="how reveal" style="--i:4">
+      <div class="how-kicker">como funciona</div>
+      <h2 class="how-title">Do catálogo ao orçamento</h2>
+      <div class="how-grid">
+        <div class="how-step" style="--c:var(--laranja)">
+          <span class="hs-num">1</span>
+          <h3>Inspire-se</h3>
+          <p>Veja nosso catálogo e escolha os móveis e recursos ideais para o seu espaço.</p>
+        </div>
+        <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
+        <div class="how-step" style="--c:var(--rosa-amor)">
+          <span class="hs-num">2</span>
+          <h3>Personalize</h3>
+          <p>Chame a gente no WhatsApp e envie as informações e necessidades do seu ambiente.</p>
+        </div>
+        <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
+        <div class="how-step" style="--c:var(--azul-agua)">
+          <span class="hs-num">3</span>
+          <h3>Orçamento</h3>
+          <p>Receba uma proposta sob medida, com valores e prazo de entrega.</p>
+        </div>
+      </div>
+      <div class="how-cta">
+        <a class="btn-cta" href="#rooms">
+          Ver catálogo agora
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="cta hero-cta reveal" style="--i:5">
       <div class="cta-card" style="--c:var(--azul-noite)">
         <h3>Faça já seu orçamento conosco</h3>
         <form class="cta-form" data-cat="Geral (topo da página)">
