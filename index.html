@@ -106,15 +106,16 @@
   .room:hover .go svg{transform:translateX(4px)}
   @media(max-width:720px){ .rooms{grid-template-columns:1fr; gap:12px; margin-top:26px} }
 
-  /* hero: captação rápida (e-mail / WhatsApp) antes das 3 categorias — bem estreita */
-  .hero-cta{max-width:400px; margin:26px auto 4px; padding:0}
-  .hero-cta .cta-card{padding:22px 24px}
-  .hero-cta .cta-card h3{font-size:1.1rem; margin-bottom:12px; line-height:1.3}
-  .hero-cta .cta-form{gap:8px}
-  .hero-cta .cta-form input{flex:1 1 150px; padding:11px 16px; font-size:.9rem; box-shadow:none}
-  .hero-cta .cta-form button{flex:0 0 auto; padding:11px 18px; font-size:.88rem}
-  .hero-cta .cta-ok{font-size:.9rem; margin-top:4px}
-  .hero-cta .btn-wa{margin-top:12px}
+  /* hero: captação rápida (e-mail / WhatsApp) antes das 3 categorias — bem estreita
+     (seletor .cta.hero-cta para vencer em especificidade as regras .cta/.cta-card definidas mais abaixo) */
+  .cta.hero-cta{max-width:400px; margin:26px auto 4px; padding:0}
+  .cta.hero-cta .cta-card{padding:22px 24px}
+  .cta.hero-cta .cta-card h3{font-size:1.1rem; margin-bottom:12px; line-height:1.3}
+  .cta.hero-cta .cta-form{gap:8px}
+  .cta.hero-cta .cta-form input{flex:1 1 150px; padding:11px 16px; font-size:.9rem; box-shadow:none}
+  .cta.hero-cta .cta-form button{flex:0 0 auto; padding:11px 18px; font-size:.88rem}
+  .cta.hero-cta .cta-ok{font-size:.9rem; margin-top:4px}
+  .cta.hero-cta .btn-wa{margin-top:12px}
 
   .note{background:#fff8ea; border:1px dashed var(--amarelo); color:#8a6d1f; border-radius:14px;
     padding:11px 16px; font-size:.84rem; max-width:var(--maxw); margin:26px auto 0; text-align:center}
