@@ -111,9 +111,8 @@
     return roof(cat.color)
       + '<section class="cat" id="'+esc(cat.slug)+'" style="--c:'+cat.color+'">'
       + '<div class="cat-head">'
-      +   '<div class="kicker reveal">Categoria '+two(idx+1)+'</div>'
-      +   '<h2 class="reveal" style="--i:1">'+esc(cat.name)+'</h2>'
-      +   '<div class="reveal" style="--i:2">'+PENCIL+'</div>'
+      +   '<h2 class="reveal">'+esc(cat.name)+'</h2>'
+      +   '<div class="reveal" style="--i:1">'+PENCIL+'</div>'
       + '</div>'
       + secs
       + ctaHTML(cat, settings)
