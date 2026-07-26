@@ -79,6 +79,21 @@
   .mx-table td, .mx-table th{white-space:nowrap}
   .mx-table input[type=checkbox]{width:17px;height:17px}
   .mx-bleed{width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;padding:0 20px;box-sizing:border-box}
+  .mx-name{cursor:pointer}
+  .mx-name:hover{text-decoration:underline}
+
+  /* modal de imagem (matriz) */
+  .alb{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:24px}
+  .alb.open{display:flex}
+  .alb-backdrop{position:absolute;inset:0;background:rgba(31,33,74,.72)}
+  .alb-panel{position:relative;z-index:1;background:#fff;border-radius:var(--r);max-width:min(92vw,640px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(31,33,74,.45)}
+  .alb-imgwrap{background:#f4f5fb;display:flex;align-items:center;justify-content:center;padding:20px;min-height:120px}
+  .alb-imgwrap img{max-width:100%;max-height:60vh;width:auto;height:auto;object-fit:contain;border-radius:10px}
+  .alb-cap{padding:14px 20px 20px;border-top:1px solid var(--linha)}
+  .alb-cap h4{font-family:var(--ff-d);font-weight:500;font-size:1.1rem;color:var(--azul-noite);margin:0}
+  .alb-cap p{margin:6px 0 0;font-size:.88rem;color:var(--suave)}
+  .alb-close{position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--azul-noite);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(31,33,74,.25)}
+  body.alb-lock{overflow:hidden}
 </style>
 </head>
 <body>
@@ -241,15 +256,15 @@
         return '<td style="text-align:center"><input type="checkbox" data-mx="'+it.id+'" data-sec="'+cl.sec.id+'" '+(has?"checked":"")+' /></td>';
       }).join("");
       return '<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">'+thumb
-        + '<span>'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span></div></td>'
+        + '<span class="mx-name" data-mxview="'+it.id+'" title="Clique para ampliar a foto">'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span></div></td>'
         + cells
         + '<td style="text-align:right"><button class="icobtn" data-mxdel="'+it.id+'" title="Excluir item definitivamente">✕</button></td></tr>';
     }).join("") : '<tr><td colspan="'+(cols.length+2)+'" class="muted">Nenhum item encontrado.</td></tr>';
 
     c.innerHTML = '<div class="mx-bleed"><div class="card">'
-      + '<p class="muted" style="margin:0 0 12px">Marque as seções às quais cada brinquedo pertence. Editar título, descrição ou foto de um item altera em todos os lugares onde ele aparece.</p>'
+      + '<p class="muted" style="margin:0 0 12px">Marque as seções às quais cada brinquedo pertence. Editar título, descrição ou foto de um item altera em todos os lugares onde ele aparece. Clique no nome de um item para ampliar a foto.</p>'
       + '<div style="margin-bottom:12px"><input type="text" id="mx-search" placeholder="Buscar por nome..." value="'+esc(state._mxq||"")+'" style="max-width:280px" /></div>'
-      + '<div style="overflow:auto;max-height:75vh"><table class="mx-table"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>'
+      + '<div id="mx-scroll" style="overflow:auto;max-height:75vh"><table class="mx-table"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>'
       + '</div></div>';
 
     var search = document.getElementById("mx-search");
@@ -265,10 +280,57 @@
       toggleLink(cb.dataset.mx, cb.dataset.sec, cb.checked);
     };
     c.onclick = function(e){
+      var view = e.target.closest("[data-mxview]");
+      if(view){ openItemPreview(view.dataset.mxview); return; }
       var b = e.target.closest("[data-mxdel]"); if(!b) return;
       deleteItemFully(b.dataset.mxdel);
     };
+
+    /* preserva a posição do scroll da tabela entre re-renders (ex: ao marcar checkbox) */
+    var scrollWrap = document.getElementById("mx-scroll");
+    if(scrollWrap){
+      scrollWrap.scrollTop = state._mxScroll || 0;
+      scrollWrap.onscroll = function(){ state._mxScroll = scrollWrap.scrollTop; };
+    }
   }
+  /* ---------- modal de imagem (clicar no nome de um item na matriz) ---------- */
+  var albBuilt = false;
+  function buildAdminLightbox(){
+    if(albBuilt) return; albBuilt = true;
+    var lb = document.createElement("div");
+    lb.className = "alb"; lb.id = "alb";
+    lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true"); lb.setAttribute("aria-hidden","true");
+    lb.innerHTML = '<div class="alb-backdrop" data-albclose></div>'
+      + '<div class="alb-panel">'
+      +   '<button class="alb-close" data-albclose aria-label="Fechar">×</button>'
+      +   '<div class="alb-imgwrap"><img class="alb-img" alt="" /></div>'
+      +   '<div class="alb-cap"><h4 class="alb-title"></h4><p class="alb-desc"></p></div>'
+      + '</div>';
+    document.body.appendChild(lb);
+    lb.addEventListener("click", function(e){ if(e.target.hasAttribute("data-albclose")) closeAdminLightbox(); });
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape" && lb.classList.contains("open")) closeAdminLightbox();
+    });
+  }
+  function openItemPreview(itemId){
+    var it = state.items.find(function(x){return x.id===itemId;});
+    if(!it) return;
+    buildAdminLightbox();
+    var lb = document.getElementById("alb");
+    var img = lb.querySelector(".alb-img");
+    if(it.image_url){ img.src = it.image_url; img.style.display = ""; }
+    else { img.removeAttribute("src"); img.style.display = "none"; }
+    lb.querySelector(".alb-title").textContent = it.title || "";
+    lb.querySelector(".alb-desc").textContent = it.description || "";
+    lb.classList.add("open"); lb.setAttribute("aria-hidden","false");
+    document.body.classList.add("alb-lock");
+  }
+  function closeAdminLightbox(){
+    var lb = document.getElementById("alb"); if(!lb) return;
+    lb.classList.remove("open"); lb.setAttribute("aria-hidden","true");
+    document.body.classList.remove("alb-lock");
+  }
+
   async function toggleLink(itemId, secId, checked){
     if(checked){
       var pos = state.links.filter(function(l){return l.section_id===secId;}).length;
