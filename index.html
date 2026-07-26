@@ -87,8 +87,20 @@
     -webkit-background-clip:text; background-clip:text; color:transparent}
   .hero .lead{max-width:600px; margin:16px auto 0; color:var(--tinta-suave); font-size:1.06rem}
 
+  /* ---------- faixa azul: destaca "como funciona" + captação de e-mail ---------- */
+  .hero-band{background:var(--azul-agua); margin-top:40px; padding:52px 0 56px}
+  .hero-band .how-kicker{color:rgba(255,255,255,.75)}
+  .hero-band .how-title{color:#fff}
+  .hero-band .how-step .hs-num{background:#fff; box-shadow:0 8px 18px rgba(0,0,0,.18)}
+  .hero-band .how-step h3{color:#fff}
+  .hero-band .how-step p{color:rgba(255,255,255,.88)}
+  .hero-band .how-arrow{color:rgba(255,255,255,.4)}
+  .hero-band .how-cta .btn-cta{background:#fff; color:var(--azul-noite); box-shadow:0 10px 24px rgba(0,0,0,.2)}
+  .hero-band .how-cta .btn-cta:hover{box-shadow:0 14px 30px rgba(0,0,0,.28)}
+  @media(max-width:640px){ .hero-band{padding:40px 0 44px} }
+
   /* ---------- fluxo B2B: 3 passos ---------- */
-  .how{max-width:760px; margin:40px auto 0}
+  .how{max-width:760px; margin:0 auto}
   .how-kicker{font-family:var(--ff-display); font-weight:500; text-transform:lowercase; letter-spacing:2.5px;
     font-size:.78rem; color:var(--tinta-suave)}
   .how-title{font-size:clamp(1.3rem,3.4vw,1.7rem); color:var(--azul-noite); margin-top:6px}
@@ -302,53 +314,58 @@
   <span class="glow" aria-hidden="true"></span>
   <div class="wrap">
     <img class="hero-logo" src="logo-color.png" alt="Casa Lúdica Moema" />
-    <div class="eyebrow reveal">catálogo b2b</div>
     <h1 class="reveal" style="--i:1">Casa Lúdica Moema</h1>
     <div class="slogan reveal" style="--i:2">Juntos por uma infância + lúdica</div>
     <p class="lead reveal" style="--i:3">Mobiliário e brinquedos lúdicos sob encomenda para escolas, clínicas, buffets e espaços de brincar. Monte o ambiente ideal para o seu negócio em 3 passos simples.</p>
+  </div>
 
-    <div class="how reveal" style="--i:4">
-      <div class="how-kicker">como funciona</div>
-      <h2 class="how-title">Do catálogo ao orçamento</h2>
-      <div class="how-grid">
-        <div class="how-step" style="--c:var(--laranja)">
-          <span class="hs-num">1</span>
-          <h3>Inspire-se</h3>
-          <p>Veja nosso catálogo e escolha os móveis e recursos ideais para o seu espaço.</p>
+  <div class="hero-band">
+    <div class="wrap">
+      <div class="how reveal" style="--i:4">
+        <div class="how-kicker">como funciona</div>
+        <h2 class="how-title">Do catálogo ao orçamento</h2>
+        <div class="how-grid">
+          <div class="how-step" style="--c:var(--laranja)">
+            <span class="hs-num">1</span>
+            <h3>Inspire-se</h3>
+            <p>Veja nosso catálogo e escolha os móveis e recursos ideais para o seu espaço.</p>
+          </div>
+          <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
+          <div class="how-step" style="--c:var(--rosa-amor)">
+            <span class="hs-num">2</span>
+            <h3>Personalize</h3>
+            <p>Chame a gente no WhatsApp e envie as informações e necessidades do seu ambiente.</p>
+          </div>
+          <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
+          <div class="how-step" style="--c:var(--amarelo)">
+            <span class="hs-num">3</span>
+            <h3>Orçamento</h3>
+            <p>Receba uma proposta sob medida, com valores e prazo de entrega.</p>
+          </div>
         </div>
-        <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
-        <div class="how-step" style="--c:var(--rosa-amor)">
-          <span class="hs-num">2</span>
-          <h3>Personalize</h3>
-          <p>Chame a gente no WhatsApp e envie as informações e necessidades do seu ambiente.</p>
-        </div>
-        <span class="how-arrow" aria-hidden="true"><svg viewBox="0 0 100 16"><path d="M2 8H86M76 2L90 8L76 14"/></svg></span>
-        <div class="how-step" style="--c:var(--azul-agua)">
-          <span class="hs-num">3</span>
-          <h3>Orçamento</h3>
-          <p>Receba uma proposta sob medida, com valores e prazo de entrega.</p>
+        <div class="how-cta">
+          <a class="btn-cta" href="#rooms">
+            Ver catálogo agora
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
         </div>
       </div>
-      <div class="how-cta">
-        <a class="btn-cta" href="#rooms">
-          Ver catálogo agora
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
+
+      <div class="cta hero-cta reveal" style="--i:5">
+        <div class="cta-card" style="--c:var(--azul-noite)">
+          <h3>Faça já seu orçamento conosco</h3>
+          <form class="cta-form" data-cat="Geral (topo da página)">
+            <input type="email" required placeholder="seu@email.com" aria-label="E-mail" />
+            <button type="submit">Enviar</button>
+          </form>
+          <p class="cta-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l6 6L20 6"/></svg> Recebemos seu contato!</p>
+          <a class="btn-wa" id="hero-wa" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1.1 2.8 1.2 3c.2.2 2.1 3.2 5 4.5.7.3 1.3.5 1.7.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg> WhatsApp</a>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="cta hero-cta reveal" style="--i:5">
-      <div class="cta-card" style="--c:var(--azul-noite)">
-        <h3>Faça já seu orçamento conosco</h3>
-        <form class="cta-form" data-cat="Geral (topo da página)">
-          <input type="email" required placeholder="seu@email.com" aria-label="E-mail" />
-          <button type="submit">Enviar</button>
-        </form>
-        <p class="cta-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l6 6L20 6"/></svg> Recebemos seu contato!</p>
-        <a class="btn-wa" id="hero-wa" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1.1 2.8 1.2 3c.2.2 2.1 3.2 5 4.5.7.3 1.3.5 1.7.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg> WhatsApp</a>
-      </div>
-    </div>
-
+  <div class="wrap">
     <div class="rooms" id="rooms"></div>
   </div>
 </section>
