@@ -72,6 +72,10 @@
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--linha)}
   th{font-family:var(--ff-d);font-weight:500;color:var(--suave);font-size:.8rem}
   .warn{background:#fff8ea;border:1px solid var(--amarelo);color:#8a6d1f;border-radius:12px;padding:12px 16px;font-size:.85rem;margin-bottom:16px}
+  .mx-table td:first-child, .mx-table th:first-child{position:sticky;left:0;background:#fff;z-index:1}
+  .mx-table th{vertical-align:bottom}
+  .mx-table td, .mx-table th{white-space:nowrap}
+  .mx-table input[type=checkbox]{width:17px;height:17px}
 </style>
 </head>
 <body>
@@ -109,18 +113,33 @@
   var val = function(id){ var e=document.getElementById(id); return e?e.value.trim():""; };
 
   /* ---------- estado ---------- */
-  var state = {cats:[], sections:[], items:[], settings:{}, tab:"catalogo"};
+  var state = {cats:[], sections:[], items:[], links:[], settings:{}, tab:"catalogo"};
 
   async function loadAll(){
     var c = await db.from("categories").select("*").order("position");
     var s = await db.from("sections").select("*").order("position");
     var i = await db.from("items").select("*").order("position");
+    var l = await db.from("item_sections").select("*").order("position");
     var st = await db.from("settings").select("*").eq("id",1).maybeSingle();
     state.cats = c.data||[]; state.sections = s.data||[]; state.items = i.data||[];
+    state.links = l.data||[];
     state.settings = (st&&st.data)||{};
   }
   function secsOf(catId){ return state.sections.filter(function(x){return x.category_id===catId;}); }
-  function itemsOf(secId){ return state.items.filter(function(x){return x.section_id===secId;}); }
+  // um item pode pertencer a mais de uma seção (tabela item_sections); cada vínculo tem posição própria
+  function itemsOf(secId){
+    var ls = state.links.filter(function(l){return l.section_id===secId;})
+      .slice().sort(function(a,b){return (a.position||0)-(b.position||0);});
+    return ls.map(function(l){
+      var it = state.items.find(function(x){return x.id===l.item_id;});
+      return it ? Object.assign({}, it, {_linkPos:l.position, _secId:secId}) : null;
+    }).filter(Boolean);
+  }
+  function secsOfItem(itemId){
+    return state.links.filter(function(l){return l.item_id===itemId;}).map(function(l){
+      return state.sections.find(function(s){return s.id===l.section_id;});
+    }).filter(Boolean);
+  }
 
   /* ============================ AUTH ============================ */
   async function boot(){
@@ -169,6 +188,7 @@
       + '<div class="wrap" style="padding:8px 20px 60px">'
       + '<div class="tabs">'
       +   '<button data-tab="catalogo">Catálogo</button>'
+      +   '<button data-tab="matriz">Matriz</button>'
       +   '<button data-tab="importar">Importar em lote</button>'
       +   '<button data-tab="config">Configurações</button>'
       +   '<button data-tab="leads">Leads</button>'
@@ -184,16 +204,86 @@
     b.classList.toggle("on", b.dataset.tab===state.tab); }); }
   function renderTab(){
     if(state.tab==="catalogo") renderCatalogo();
+    else if(state.tab==="matriz") renderMatrix();
     else if(state.tab==="importar") renderImport();
     else if(state.tab==="config") renderConfig();
     else renderLeads();
   }
   async function refresh(){ await loadAll(); renderTab(); }
 
+  /* ============================ MATRIZ (item × seção) ============================ */
+  function renderMatrix(){
+    var c = document.getElementById("tabc");
+    var cols = [];
+    state.cats.forEach(function(cat){ secsOf(cat.id).forEach(function(sec){ cols.push({sec:sec, cat:cat}); }); });
+
+    var q = (state._mxq||"").toLowerCase();
+    var items = state.items.slice().sort(function(a,b){ return (a.title||"").localeCompare(b.title||"","pt-BR"); });
+    if(q){ items = items.filter(function(it){ return (it.title||"").toLowerCase().indexOf(q) >= 0; }); }
+
+    var head = '<tr><th>Brinquedo</th>' + cols.map(function(cl){
+      return '<th style="text-align:center">'
+        + '<span class="swatch" style="width:9px;height:9px;display:inline-block;vertical-align:middle;margin-right:4px;background:'+esc(cl.sec.color||cl.cat.color)+'"></span>'
+        + '<span style="font-size:.72rem">'+esc(cl.cat.name)+'</span><br>'
+        + '<span style="font-weight:600">'+esc(cl.sec.name)+'</span>'
+        + '</th>';
+    }).join("") + '<th></th></tr>';
+
+    var rows = items.length ? items.map(function(it){
+      var thumb = it.image_url
+        ? '<img src="'+esc(it.image_url)+'" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover;flex:none" />'
+        : '<div style="width:34px;height:34px;border-radius:6px;background:#eef;flex:none"></div>';
+      var cells = cols.map(function(cl){
+        var has = state.links.some(function(l){ return l.item_id===it.id && l.section_id===cl.sec.id; });
+        return '<td style="text-align:center"><input type="checkbox" data-mx="'+it.id+'" data-sec="'+cl.sec.id+'" '+(has?"checked":"")+' /></td>';
+      }).join("");
+      return '<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">'+thumb
+        + '<span>'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span></div></td>'
+        + cells
+        + '<td style="text-align:right"><button class="icobtn" data-mxdel="'+it.id+'" title="Excluir item definitivamente">✕</button></td></tr>';
+    }).join("") : '<tr><td colspan="'+(cols.length+2)+'" class="muted">Nenhum item encontrado.</td></tr>';
+
+    c.innerHTML = '<div class="card">'
+      + '<p class="muted" style="margin:0 0 12px">Marque as seções às quais cada brinquedo pertence. Editar título, descrição ou foto de um item altera em todos os lugares onde ele aparece.</p>'
+      + '<div style="margin-bottom:12px"><input type="text" id="mx-search" placeholder="Buscar por nome..." value="'+esc(state._mxq||"")+'" style="max-width:280px" /></div>'
+      + '<div style="overflow:auto;max-height:68vh"><table class="mx-table"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>'
+      + '</div>';
+
+    var search = document.getElementById("mx-search");
+    search.oninput = function(e){
+      state._mxq = e.target.value;
+      var pos = e.target.selectionStart;
+      renderMatrix();
+      var ni = document.getElementById("mx-search");
+      ni.focus(); try{ ni.setSelectionRange(pos,pos); }catch(_){}
+    };
+    c.onchange = function(e){
+      var cb = e.target.closest("[data-mx]"); if(!cb) return;
+      toggleLink(cb.dataset.mx, cb.dataset.sec, cb.checked);
+    };
+    c.onclick = function(e){
+      var b = e.target.closest("[data-mxdel]"); if(!b) return;
+      deleteItemFully(b.dataset.mxdel);
+    };
+  }
+  async function toggleLink(itemId, secId, checked){
+    if(checked){
+      var pos = state.links.filter(function(l){return l.section_id===secId;}).length;
+      var r = await db.from("item_sections").insert({item_id:itemId, section_id:secId, position:pos});
+      if(r.error){ toast("Erro ao vincular."); return; }
+      toast("Vinculado à seção.");
+    } else {
+      var r2 = await db.from("item_sections").delete().eq("item_id", itemId).eq("section_id", secId);
+      if(r2.error){ toast("Erro ao desvincular."); return; }
+      toast("Desvinculado da seção.");
+    }
+    await loadAll(); renderTab();
+  }
+
   /* ============================ CATÁLOGO ============================ */
   function renderCatalogo(){
     var c = document.getElementById("tabc");
-    var html = '<p class="muted" style="margin:0 0 14px">Até 3 categorias. Cada categoria tem seções, e cada seção tem itens (título + foto).</p>';
+    var html = '<p class="muted" style="margin:0 0 14px">Até 3 categorias. Cada categoria tem seções. Um mesmo brinquedo pode pertencer a mais de uma seção — use a aba <b>Matriz</b> para gerenciar isso com facilidade.</p>';
     state.cats.forEach(function(cat, ci){ html += catPanel(cat, ci); });
     if(state.cats.length < 3){
       html += '<button class="btn g" id="add-cat">+ Adicionar categoria</button>';
@@ -252,16 +342,20 @@
     var thumb = it.image_url
       ? '<img class="thumb" src="'+esc(it.image_url)+'" alt="" />'
       : '<div class="thumb">sem foto</div>';
+    var secId = it._secId;
+    var otherSecs = secsOfItem(it.id).filter(function(s){return s.id!==secId;});
+    var also = otherSecs.length ? '<span class="pill" title="Também aparece em outra(s) seção(ões)">+'+otherSecs.length+' seção(ões)</span>' : '';
     return '<div class="item" data-item="'+it.id+'">'
       + thumb
       + '<input type="text" class="grow" id="it-'+it.id+'" value="'+esc(it.title)+'" data-act="item-title" data-id="'+it.id+'" />'
+      + also
       + '<label class="muted" style="display:flex;align-items:center;gap:5px;margin:0;font-family:var(--ff-t)">'
       +   '<input type="checkbox" data-act="item-active" data-id="'+it.id+'" '+(it.active?"checked":"")+' style="width:auto" /> ativo</label>'
       + '<label class="btn ghost sm" style="margin:0;position:relative;overflow:hidden">trocar foto'
       +   '<input type="file" accept="image/*" data-act="item-img" data-id="'+it.id+'" style="position:absolute;inset:0;opacity:0;cursor:pointer" /></label>'
-      + '<button class="icobtn" data-act="item-up" data-id="'+it.id+'" title="Subir">↑</button>'
-      + '<button class="icobtn" data-act="item-down" data-id="'+it.id+'" title="Descer">↓</button>'
-      + '<button class="icobtn" data-act="item-del" data-id="'+it.id+'" title="Excluir">✕</button>'
+      + '<button class="icobtn" data-act="item-up" data-id="'+it.id+'" data-sec="'+secId+'" title="Subir">↑</button>'
+      + '<button class="icobtn" data-act="item-down" data-id="'+it.id+'" data-sec="'+secId+'" title="Descer">↓</button>'
+      + '<button class="icobtn" data-act="item-unlink" data-id="'+it.id+'" data-sec="'+secId+'" title="Remover desta seção (o item continua cadastrado)">✕</button>'
       + '<div class="desc"><textarea id="id-'+it.id+'" placeholder="Descrição (dimensões, especificações...)" data-act="item-desc" data-id="'+it.id+'">'+esc(it.description)+'</textarea></div>'
       + '</div>';
   }
@@ -280,9 +374,9 @@
       if(act==="sec-up") return moveRow("sections", secsOf(parentCatOfSec(id)), id, -1);
       if(act==="sec-down") return moveRow("sections", secsOf(parentCatOfSec(id)), id, 1);
       if(act==="item-add") return addItem(id);
-      if(act==="item-del") return deleteItem(id);
-      if(act==="item-up") return moveRow("items", itemsOf(parentSecOfItem(id)), id, -1);
-      if(act==="item-down") return moveRow("items", itemsOf(parentSecOfItem(id)), id, 1);
+      if(act==="item-unlink") return unlinkItem(id, b.dataset.sec);
+      if(act==="item-up") return moveItemInSection(id, b.dataset.sec, -1);
+      if(act==="item-down") return moveItemInSection(id, b.dataset.sec, 1);
     };
     c.onchange = function(e){
       var b = e.target.closest("[data-act]"); if(!b) return;
@@ -295,7 +389,6 @@
     };
   }
   function parentCatOfSec(secId){ var s=state.sections.find(function(x){return x.id===secId;}); return s?s.category_id:null; }
-  function parentSecOfItem(itemId){ var i=state.items.find(function(x){return x.id===itemId;}); return i?i.section_id:null; }
 
   /* ----- mutations: categorias ----- */
   async function addCategory(){
@@ -316,7 +409,7 @@
     await refresh(); toast("Categoria salva.");
   }
   async function deleteCategory(id){
-    if(!confirm("Excluir esta categoria e todas as suas seções e itens?")) return;
+    if(!confirm("Excluir esta categoria e todas as suas seções? Os itens continuam cadastrados, mas deixam de aparecer em qualquer seção desta categoria.")) return;
     var r = await db.from("categories").delete().eq("id", id);
     if(r.error){ toast("Erro ao excluir."); return; }
     await refresh(); toast("Categoria excluída.");
@@ -337,7 +430,7 @@
     await loadAll(); toast("Seção salva.");
   }
   async function deleteSection(id){
-    if(!confirm("Excluir esta seção e seus itens?")) return;
+    if(!confirm("Excluir esta seção? Os itens vinculados deixam de aparecer aqui, mas continuam cadastrados (e podem estar em outras seções).")) return;
     var r = await db.from("sections").delete().eq("id", id);
     if(r.error){ toast("Erro ao excluir seção."); return; }
     await refresh(); toast("Seção excluída.");
@@ -350,12 +443,36 @@
     var file = fileInput && fileInput.files[0];
     var url = "";
     if(file){ url = await uploadImage(file); if(url===null){ return; } }
-    var count = itemsOf(secId).length;
     var descEl = document.getElementById("nd-"+secId);
-    var r = await db.from("items").insert({section_id:secId, title:title, image_url:url||null,
-      description:(descEl&&descEl.value.trim())||null, position:count, active:true});
+    var r = await db.from("items").insert({title:title, image_url:url||null,
+      description:(descEl&&descEl.value.trim())||null, position:0, active:true}).select().single();
     if(r.error){ toast("Erro ao criar item."); return; }
+    var pos = itemsOf(secId).length;
+    var rl = await db.from("item_sections").insert({item_id:r.data.id, section_id:secId, position:pos});
+    if(rl.error){ toast("Item criado, mas houve erro ao vincular à seção."); await refresh(); return; }
     await refresh(); toast("Item adicionado.");
+  }
+  async function unlinkItem(itemId, secId){
+    if(!confirm("Remover este item desta seção? Ele continua cadastrado e pode estar em outras seções (use a aba Matriz para reatribuir).")) return;
+    var r = await db.from("item_sections").delete().eq("item_id", itemId).eq("section_id", secId);
+    if(r.error){ toast("Erro ao remover."); return; }
+    await refresh(); toast("Removido da seção.");
+  }
+  async function moveItemInSection(itemId, secId, dir){
+    var arr = itemsOf(secId);
+    var i = arr.findIndex(function(x){return x.id===itemId;});
+    var j = i+dir; if(i<0 || j<0 || j>=arr.length) return;
+    var a = arr[i], b = arr[j];
+    await db.from("item_sections").update({position:b._linkPos}).eq("item_id", a.id).eq("section_id", secId);
+    await db.from("item_sections").update({position:a._linkPos}).eq("item_id", b.id).eq("section_id", secId);
+    await refresh();
+  }
+  async function deleteItemFully(id){
+    var it = state.items.find(function(x){return x.id===id;});
+    if(!confirm('Excluir definitivamente "'+(it?it.title:"este item")+'"? Ele será removido de todas as seções e não poderá ser recuperado.')) return;
+    var r = await db.from("items").delete().eq("id", id);
+    if(r.error){ toast("Erro ao excluir item."); return; }
+    await refresh(); toast("Item excluído definitivamente.");
   }
   async function saveItemTitle(id){
     var r = await db.from("items").update({title: val("it-"+id)}).eq("id", id);
@@ -383,13 +500,6 @@
     if(r.error){ toast("Erro ao salvar foto."); return; }
     await refresh(); toast("Foto atualizada.");
   }
-  async function deleteItem(id){
-    if(!confirm("Excluir este item?")) return;
-    var r = await db.from("items").delete().eq("id", id);
-    if(r.error){ toast("Erro ao excluir item."); return; }
-    await refresh(); toast("Item excluído.");
-  }
-
   async function uploadImage(file){
     try{
       var ext = (file.name.split(".").pop()||"jpg").toLowerCase();
@@ -435,11 +545,11 @@
   }
 
   function renderImport(){
-    var sample = '[\n  {"file":"item1.png","title":"Kit Bandinha Frutas","description":"9 instrumentos","category":"escolas","section":"Recursos educacionais"},\n  {"file":"item2.png","title":"Playground modular","description":"3 m x 2 m","category":"escolas","section":"Playground"}\n]';
+    var sample = '[\n  {"file":"item1.png","title":"Kit Bandinha Frutas","description":"9 instrumentos","category":"escolas","section":"Recursos educacionais"},\n  {"file":"item2.png","title":"Playground modular","description":"3 m x 2 m","category":"escolas","sections":["Playground","Recursos educacionais"]}\n]';
     document.getElementById("tabc").innerHTML =
       '<div class="card">'
       + '<h3 style="margin-bottom:6px">Importar vários itens de uma vez</h3>'
-      + '<p class="muted" style="margin:0 0 14px">Selecione as imagens e cole a tabela (JSON) com os dados de cada item. O campo <b>file</b> deve ser o nome exato do arquivo da imagem.</p>'
+      + '<p class="muted" style="margin:0 0 14px">Selecione as imagens e cole a tabela (JSON) com os dados de cada item. O campo <b>file</b> deve ser o nome exato do arquivo da imagem. Para um item pertencer a mais de uma seção (dentro da mesma categoria), use <b>"sections": [...]</b> em vez de <b>"section"</b>.</p>'
       + '<div class="warn" id="imp-struct-warn" style="'+(state.cats.length?'display:none':'')+'">As categorias/seções ainda não existem. Clique abaixo para criá-las no padrão do site.</div>'
       + '<button class="btn ghost sm" id="imp-seed" style="margin-bottom:14px">Criar categorias e seções padrão</button>'
       + '<div style="margin-bottom:12px"><label>Imagens dos itens</label><input type="file" id="imp-files" accept="image/*" multiple /></div>'
@@ -493,20 +603,28 @@
     var posBySec={};
     for(var k=0;k<entries.length;k++){
       var e=entries[k]; var label=(e.title||e.file||("item "+(k+1)));
-      var sec=findSection(e.category, e.section);
-      if(!sec){ fail++; lines.push("✗ "+label+" — seção não encontrada ("+e.category+" / "+e.section+")"); continue; }
+      var secNames = Array.isArray(e.sections) ? e.sections : [e.section];
+      var secs = secNames.map(function(sn){ return findSection(e.category, sn); }).filter(Boolean);
+      if(!secs.length){ fail++; lines.push("✗ "+label+" — seção não encontrada ("+e.category+" / "+secNames.join(", ")+")"); log.textContent=lines.join("\n"); continue; }
       var url=null;
       if(e.file){
         var f=files[e.file];
-        if(!f){ fail++; lines.push("✗ "+label+" — arquivo não selecionado: "+e.file); continue; }
+        if(!f){ fail++; lines.push("✗ "+label+" — arquivo não selecionado: "+e.file); log.textContent=lines.join("\n"); continue; }
         url=await uploadImage(f);
-        if(url===null){ fail++; lines.push("✗ "+label+" — falha no upload da imagem"); continue; }
+        if(url===null){ fail++; lines.push("✗ "+label+" — falha no upload da imagem"); log.textContent=lines.join("\n"); continue; }
       }
-      if(posBySec[sec.id]===undefined) posBySec[sec.id]=itemsOf(sec.id).length;
-      var pos=posBySec[sec.id]++;
-      var r=await db.from("items").insert({section_id:sec.id, title:e.title||label, description:e.description||null, image_url:url, position:pos, active:true});
-      if(r.error){ fail++; lines.push("✗ "+label+" — "+(r.error.message||"erro ao inserir")); }
-      else { okc++; lines.push("✓ "+label+" → "+e.category+" / "+e.section); }
+      var r=await db.from("items").insert({title:e.title||label, description:e.description||null, image_url:url, position:0, active:true}).select().single();
+      if(r.error){ fail++; lines.push("✗ "+label+" — "+(r.error.message||"erro ao inserir")); log.textContent=lines.join("\n"); continue; }
+      var okSecNames=[];
+      for(var si=0; si<secs.length; si++){
+        var sec=secs[si];
+        if(posBySec[sec.id]===undefined) posBySec[sec.id]=itemsOf(sec.id).length;
+        var pos=posBySec[sec.id]++;
+        var rl=await db.from("item_sections").insert({item_id:r.data.id, section_id:sec.id, position:pos});
+        if(!rl.error) okSecNames.push(sec.name);
+      }
+      if(okSecNames.length){ okc++; lines.push("✓ "+label+" → "+e.category+" / "+okSecNames.join(", ")); }
+      else { fail++; lines.push("✗ "+label+" — item criado, mas falhou ao vincular seções"); }
       log.textContent=lines.join("\n");
     }
     await loadAll();

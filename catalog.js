@@ -38,12 +38,21 @@
     try{
       var c = await db.from("categories").select("id,slug,name,color,cta_title,cta_text,position").order("position");
       var s = await db.from("sections").select("id,category_id,name,color,position").order("position");
-      var i = await db.from("items").select("id,section_id,title,description,image_url,position,active").eq("active", true).order("position");
+      var i = await db.from("items").select("id,title,description,image_url,position,active").eq("active", true).order("position");
+      var links = await db.from("item_sections").select("item_id,section_id,position").order("position");
       var st = await db.from("settings").select("*").eq("id", 1).maybeSingle();
-      if(c.error || s.error || i.error) throw (c.error || s.error || i.error);
+      if(c.error || s.error || i.error || links.error) throw (c.error || s.error || i.error || links.error);
+      var itemsById = {};
+      (i.data || []).forEach(function(it){ itemsById[it.id] = it; });
+      /* um item pode pertencer a mais de uma seção (tabela item_sections) */
       var cats = (c.data || []).map(function(cat){
         cat.sections = (s.data || []).filter(function(x){return x.category_id===cat.id;}).map(function(sec){
-          sec.items = (i.data || []).filter(function(y){return y.section_id===sec.id;});
+          var secLinks = (links.data || []).filter(function(l){return l.section_id===sec.id;});
+          sec.items = secLinks
+            .map(function(l){ var it = itemsById[l.item_id]; return it ? {item:it, pos:l.position} : null; })
+            .filter(Boolean)
+            .sort(function(a,b){ return (a.pos||0) - (b.pos||0); })
+            .map(function(x){ return x.item; });
           return sec;
         });
         return cat;
