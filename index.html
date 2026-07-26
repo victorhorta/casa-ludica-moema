@@ -106,6 +106,11 @@
   .room:hover .go svg{transform:translateX(4px)}
   @media(max-width:720px){ .rooms{grid-template-columns:1fr; gap:12px; margin-top:26px} }
 
+  /* hero: captação rápida (e-mail / WhatsApp) antes das 3 categorias */
+  .hero-cta{margin:30px auto 6px}
+  .hero-cta .cta-card{padding:32px 28px}
+  @media(max-width:560px){ .hero-cta .cta-card{padding:24px 20px} }
+
   .note{background:#fff8ea; border:1px dashed var(--amarelo); color:#8a6d1f; border-radius:14px;
     padding:11px 16px; font-size:.84rem; max-width:var(--maxw); margin:26px auto 0; text-align:center}
 
@@ -170,6 +175,15 @@
   .card .cap{padding:15px 17px 18px}
   .card .cap h4{font-family:var(--ff-display); font-weight:500; font-size:1.04rem; color:var(--azul-noite)}
   .card .cap .cap-desc{margin:5px 0 0; font-size:.82rem; line-height:1.35; color:var(--tinta-suave)}
+
+  /* botão "ver mais" — por padrão só a 1ª fileira da seção é exibida (desktop) */
+  .row-toggle{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-top:16px;
+    background:transparent; border:1.5px dashed color-mix(in srgb, var(--sc) 45%, transparent); border-radius:14px;
+    padding:12px; font-family:var(--ff-display); font-weight:500; font-size:.88rem; color:var(--sc);
+    cursor:pointer; transition:background .2s ease, border-color .2s ease}
+  .row-toggle:hover{background:color-mix(in srgb, var(--sc) 8%, #fff); border-color:var(--sc)}
+  .row-toggle .chev{width:16px; height:16px; flex:none}
+  .row-toggle .chev svg{width:100%; height:100%; stroke:currentColor; fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round}
 
   /* ---------- mobile: seções viram carrossel horizontal + cards compactos ---------- */
   @media(max-width:720px){
@@ -259,6 +273,21 @@
     <h1 class="reveal" style="--i:1">Casa Lúdica Moema</h1>
     <div class="slogan reveal" style="--i:2">Juntos por uma infância + lúdica</div>
     <p class="lead reveal" style="--i:3">Ambientes que encantam e transformam a infância. Escolha um espaço e conheça nossas soluções em brinquedos e mobiliário lúdico.</p>
+
+    <div class="cta hero-cta reveal" style="--i:4">
+      <div class="cta-card" style="--c:var(--azul-noite)">
+        <h3>Faça já seu orçamento conosco</h3>
+        <p>Deixe seu e-mail ou fale agora pelo WhatsApp — nossa equipe responde rapidinho.</p>
+        <form class="cta-form" data-cat="Geral (topo da página)">
+          <input type="email" required placeholder="seu@email.com" aria-label="E-mail" />
+          <button type="submit">Quero meu orçamento</button>
+        </form>
+        <p class="cta-ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l6 6L20 6"/></svg> Recebemos seu contato! Em breve falamos com você.</p>
+        <div class="cta-social">
+          <a id="hero-wa" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1.1 2.8 1.2 3c.2.2 2.1 3.2 5 4.5.7.3 1.3.5 1.7.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.6-.4zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg> Falar no WhatsApp</a>
+        </div>
+      </div>
+    </div>
 
     <div class="rooms" id="rooms"></div>
   </div>

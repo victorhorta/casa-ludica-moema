@@ -132,7 +132,7 @@
 
     /* links Instagram / WhatsApp */
     var ig = settings.instagram_url || "#", wa = settings.whatsapp_url || "#";
-    ["#wa-top","#wa-foot"].forEach(function(id){ var e=document.querySelector(id); if(e) e.href=wa; });
+    ["#wa-top","#wa-foot","#hero-wa"].forEach(function(id){ var e=document.querySelector(id); if(e) e.href=wa; });
     var igf=document.querySelector("#ig-foot"); if(igf) igf.href=ig;
 
     /* nav (scroll-spy) */
@@ -159,6 +159,7 @@
     initMotion();
     initZoom();
     initAccordion();
+    initRowLimit();
   }
 
   /* ---------- lightbox (ampliar imagem do produto) ---------- */
@@ -297,8 +298,62 @@
       var head = e.target.closest(".s-head");
       if(!head || !root.contains(head)) return;
       var open = head.getAttribute("aria-expanded") !== "false";
+      var body = document.getElementById(head.getAttribute("aria-controls"));
+      var grid = body ? body.querySelector(".grid") : null;
+      if(open && grid && !grid.__expanded){
+        /* seção visível mas só com a 1ª fileira: o chevron expande tudo */
+        expandGrid(grid);
+        return;
+      }
+      /* já com tudo visível (ou sem itens): chevron colapsa/mostra a seção inteira */
       head.setAttribute("aria-expanded", open ? "false" : "true");
+      if(!open && grid) expandGrid(grid); /* ao reabrir, mostra tudo (evita re-limitar) */
     });
+  }
+
+  /* ---------- por padrão só a 1ª fileira de cada seção é exibida (desktop) ---------- */
+  function expandGrid(grid){
+    if(!grid || grid.__expanded) return;
+    grid.__expanded = true;
+    Array.prototype.forEach.call(grid.children, function(c){ c.style.display = ""; });
+    var btn = grid.parentNode && grid.parentNode.querySelector(".row-toggle");
+    if(btn) btn.remove();
+  }
+  function initRowLimit(){
+    var root = document.getElementById("catalog-root");
+    if(!root) return;
+    function apply(){
+      Array.prototype.forEach.call(root.querySelectorAll(".grid"), function(grid){
+        if(grid.__expanded) return;
+        var cards = Array.prototype.filter.call(grid.children, function(c){ return c.classList.contains("card"); });
+        var old = grid.parentNode && grid.parentNode.querySelector(".row-toggle");
+        if(cards.length < 2){ if(old) old.remove(); return; }
+        var firstTop = cards[0].offsetTop;
+        var rowCount = 0;
+        for(var i=0;i<cards.length;i++){
+          if(Math.abs(cards[i].offsetTop - firstTop) < 2){ rowCount++; } else { break; }
+        }
+        if(rowCount >= cards.length){
+          cards.forEach(function(c){ c.style.display = ""; });
+          if(old) old.remove();
+          return;
+        }
+        cards.forEach(function(c, ix){ c.style.display = ix < rowCount ? "" : "none"; });
+        var remaining = cards.length - rowCount;
+        var label = "Ver mais "+remaining+(remaining===1?" item":" itens");
+        if(old){ old.querySelector(".rt-label").textContent = label; }
+        else{
+          var btn = document.createElement("button");
+          btn.type = "button"; btn.className = "row-toggle";
+          btn.innerHTML = '<span class="rt-label">'+label+'</span><span class="chev" aria-hidden="true">'+CHEV+'</span>';
+          btn.addEventListener("click", function(){ expandGrid(grid); });
+          grid.insertAdjacentElement("afterend", btn);
+        }
+      });
+    }
+    apply();
+    var t;
+    window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(apply, 200); });
   }
 
   /* ---------- formulário de leads ---------- */
