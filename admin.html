@@ -728,76 +728,202 @@
   }
 
   /* ============================ CATÁLOGO PDF ============================ */
-  function pdfSelected(itemId){
-    return (state._pdfSel && state._pdfSel[itemId] !== undefined) ? state._pdfSel[itemId] : true;
+  var PDF_LS_KEY = "clm_pdf_catalogs_v1";
+  var PDF_FONTS_READY = false;
+
+  function pdfLoadCatalogs(){
+    try{ return JSON.parse(localStorage.getItem(PDF_LS_KEY)) || []; }catch(e){ return []; }
   }
-  function setPdfSelected(itemId, v){
-    if(!state._pdfSel) state._pdfSel = {};
-    state._pdfSel[itemId] = v;
+  function pdfSaveCatalogs(list){
+    try{ localStorage.setItem(PDF_LS_KEY, JSON.stringify(list)); }
+    catch(e){ toast("Não foi possível salvar no armazenamento local do navegador."); }
+  }
+  function fmtDate(iso){ try{ return new Date(iso).toLocaleString("pt-BR"); }catch(e){ return ""; } }
+  function pdfNewDraft(){
+    var s = state.settings || {};
+    return {
+      id: "cat_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+      name: "Novo catálogo",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      cover:{
+        title: s.hero_title || "Casa Lúdica Moema",
+        sub: s.hero_slogan || "Juntos por uma infância + lúdica",
+        lead: "Mobiliário e brinquedos lúdicos sob medida para escolas, clínicas, buffets e espaços de brincar.",
+        email: s.pdf_email || "",
+        phone: s.pdf_phone_display || "",
+        site: s.pdf_site_url || "casaludicamoema.com.br"
+      },
+      groups: [ {id:"g_"+Date.now(), name:"Grupo 1", color: PALETTE[0]?PALETTE[0].hex:"#373A81", itemIds:[]} ]
+    };
+  }
+
+  function pdfAddGroup(){
+    var d = state._pdfDraft, n = d.groups.length+1;
+    d.groups.push({id:"g_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+      name:"Grupo "+n, color:(PALETTE[(n-1)%PALETTE.length]||PALETTE[0]).hex, itemIds:[]});
+    renderPdfTab();
+  }
+  function pdfRemoveGroup(gid){
+    var d = state._pdfDraft;
+    if(d.groups.length<=1){ toast("Mantenha ao menos um macro grupo."); return; }
+    if(!confirm("Remover este macro grupo deste catálogo?")) return;
+    d.groups = d.groups.filter(function(g){return g.id!==gid;});
+    renderPdfTab();
+  }
+  function pdfToggleItemInGroup(gid, itemId, checked){
+    var d = state._pdfDraft, g = d.groups.find(function(x){return x.id===gid;});
+    if(!g) return;
+    var idx = g.itemIds.indexOf(itemId);
+    if(checked && idx===-1) g.itemIds.push(itemId);
+    if(!checked && idx!==-1) g.itemIds.splice(idx,1);
+    d.updatedAt = new Date().toISOString();
+  }
+
+  function pdfSaveCurrent(asNew){
+    var d = state._pdfDraft;
+    d.name = val("pdf-cat-name") || d.name || "Catálogo sem nome";
+    if(asNew){
+      d = JSON.parse(JSON.stringify(d));
+      d.id = "cat_"+Date.now()+"_"+Math.random().toString(36).slice(2,7);
+      d.createdAt = new Date().toISOString();
+      d.name = d.name + " (cópia)";
+      state._pdfDraft = d;
+    }
+    d.updatedAt = new Date().toISOString();
+    var list = state._pdfCatalogs.slice();
+    var idx = list.findIndex(function(x){return x.id===d.id;});
+    if(idx>=0) list[idx]=d; else list.push(d);
+    state._pdfCatalogs = list;
+    pdfSaveCatalogs(list);
+    toast("Catálogo salvo neste navegador.");
+    renderPdfTab();
+  }
+  function pdfDeleteCurrent(){
+    var d = state._pdfDraft;
+    var list = state._pdfCatalogs.filter(function(x){return x.id!==d.id;});
+    if(list.length === state._pdfCatalogs.length){ toast("Este rascunho ainda não foi salvo."); return; }
+    if(!confirm('Excluir o catálogo "'+d.name+'" salvo neste navegador?')) return;
+    state._pdfCatalogs = list;
+    pdfSaveCatalogs(list);
+    state._pdfDraft = pdfNewDraft();
+    toast("Catálogo excluído.");
+    renderPdfTab();
+  }
+  function pdfExportJson(){
+    var d = state._pdfDraft;
+    var blob = new Blob([JSON.stringify(d,null,2)], {type:"application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = (slugify(d.name||"catalogo")||"catalogo")+".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function pdfImportJsonChange(e){
+    var file = e.target.files[0]; if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var obj = JSON.parse(reader.result);
+        if(!obj || !obj.groups || !obj.cover) throw new Error("formato inválido");
+        obj.id = "cat_"+Date.now()+"_"+Math.random().toString(36).slice(2,7);
+        obj.createdAt = obj.createdAt || new Date().toISOString();
+        obj.updatedAt = new Date().toISOString();
+        state._pdfDraft = obj;
+        toast("Catálogo importado. Clique em Salvar para guardá-lo neste navegador.");
+        renderPdfTab();
+      }catch(err){ toast("Arquivo JSON inválido."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   function renderPdfTab(){
+    if(!state._pdfCatalogs) state._pdfCatalogs = pdfLoadCatalogs();
+    if(!state._pdfDraft) state._pdfDraft = pdfNewDraft();
+    var d = state._pdfDraft;
     var c = document.getElementById("tabc");
-    var s = state.settings || {};
+
+    var savedIds = state._pdfCatalogs.map(function(x){return x.id;});
+    var isSaved = savedIds.indexOf(d.id) !== -1;
+    var opts = "";
+    if(!isSaved) opts += '<option value="'+d.id+'" selected>Rascunho: '+esc(d.name)+' (não salvo)</option>';
+    state._pdfCatalogs.slice().sort(function(a,b){return (b.updatedAt||"").localeCompare(a.updatedAt||"");}).forEach(function(cat){
+      opts += '<option value="'+cat.id+'" '+(cat.id===d.id?"selected":"")+'>'+esc(cat.name)+'</option>';
+    });
+    var meta = isSaved ? ("Criado em "+fmtDate(d.createdAt)+" · Atualizado em "+fmtDate(d.updatedAt))
+      : "Rascunho ainda não salvo neste navegador.";
+
     var html = '<div class="card" style="margin-bottom:16px">'
-      + '<h3 style="margin-bottom:4px">Gerar catálogo em PDF</h3>'
-      + '<p class="muted" style="margin:0 0 14px">Escolha as categorias, seções e brinquedos que entram no PDF e ajuste os dados de contato que aparecem na última página.</p>'
-      + '<div class="grid2">'
-      +   '<div><label>Título da capa</label><input type="text" id="pdf-title" value="'+esc(s.hero_title||"Casa Lúdica Moema")+'" /></div>'
-      +   '<div><label>Subtítulo da capa</label><input type="text" id="pdf-sub" value="'+esc(s.hero_slogan||"Juntos por uma infância + lúdica")+'" /></div>'
+      + '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">'
+      +   '<div class="row" style="gap:8px;flex-wrap:wrap">'
+      +     '<select id="pdf-cat-select" style="min-width:220px;width:auto">'+opts+'</select>'
+      +     '<button class="btn ghost sm" id="pdf-cat-new">+ Novo catálogo</button>'
+      +   '</div>'
+      +   '<div class="row" style="gap:8px;flex-wrap:wrap">'
+      +     '<button class="btn g sm" id="pdf-cat-save">Salvar</button>'
+      +     '<button class="btn ghost sm" id="pdf-cat-saveas">Salvar como novo</button>'
+      +     '<button class="btn ghost sm" id="pdf-cat-export">Exportar JSON</button>'
+      +     '<button class="btn ghost sm" id="pdf-cat-importbtn">Importar JSON</button>'
+      +     '<input type="file" id="pdf-cat-file" accept="application/json" style="display:none" />'
+      +     '<button class="btn r sm" id="pdf-cat-delete">Excluir</button>'
+      +   '</div>'
       + '</div>'
-      + '<div class="grid2" style="margin-top:12px">'
-      +   '<div><label>E-mail de contato (última página)</label><input type="text" id="pdf-email" value="'+esc(s.pdf_email||"")+'" placeholder="contato@casaludicamoema.com.br" /></div>'
-      +   '<div><label>WhatsApp exibido (última página)</label><input type="text" id="pdf-phone" value="'+esc(s.pdf_phone_display||"")+'" placeholder="(11) 99999-9999" /></div>'
-      + '</div>'
-      + '<div style="margin-top:12px"><label>Site (última página)</label><input type="text" id="pdf-site" value="'+esc(s.pdf_site_url||"casaludicamoema.com.br")+'" /></div>'
-      + '<button class="btn ghost sm" style="margin-top:12px" id="pdf-save-contact">Salvar dados de contato</button>'
+      + '<p class="muted" style="margin:10px 0 0">'+esc(meta)+'</p>'
       + '</div>';
 
     html += '<div class="card" style="margin-bottom:16px">'
-      + '<div class="row" style="justify-content:space-between;margin-bottom:10px">'
-      +   '<h3 style="margin:0">Selecionar conteúdo</h3>'
-      +   '<div class="row" style="gap:8px">'
-      +     '<button class="btn ghost sm" id="pdf-all">Selecionar tudo</button>'
-      +     '<button class="btn ghost sm" id="pdf-none">Limpar seleção</button>'
-      +   '</div>'
+      + '<h3 style="margin-bottom:12px">Capa e contato do PDF</h3>'
+      + '<div style="margin-bottom:12px"><label>Nome do catálogo (uso interno, não aparece no PDF)</label><input type="text" id="pdf-cat-name" value="'+esc(d.name)+'" /></div>'
+      + '<div class="grid2">'
+      +   '<div><label>Título da capa</label><input type="text" id="pdf-title" value="'+esc(d.cover.title)+'" /></div>'
+      +   '<div><label>Subtítulo da capa</label><input type="text" id="pdf-sub" value="'+esc(d.cover.sub)+'" /></div>'
+      + '</div>'
+      + '<div style="margin-top:12px"><label>Texto de abertura</label><textarea id="pdf-lead" rows="2">'+esc(d.cover.lead)+'</textarea></div>'
+      + '<div class="grid2" style="margin-top:12px">'
+      +   '<div><label>E-mail de contato (última página)</label><input type="text" id="pdf-email" value="'+esc(d.cover.email)+'" placeholder="contato@casaludicamoema.com.br" /></div>'
+      +   '<div><label>WhatsApp exibido (última página)</label><input type="text" id="pdf-phone" value="'+esc(d.cover.phone)+'" placeholder="(11) 99999-9999" /></div>'
+      + '</div>'
+      + '<div style="margin-top:12px"><label>Site (última página)</label><input type="text" id="pdf-site" value="'+esc(d.cover.site)+'" /></div>'
       + '</div>';
 
-    if(!state.cats.length){
-      html += '<p class="muted">Cadastre categorias e seções na aba Catálogo primeiro.</p>';
-    }
-    state.cats.forEach(function(cat){
-      var secs = secsOf(cat.id);
-      html += '<div style="margin-bottom:18px">'
-        + '<div class="row" style="gap:8px;margin-bottom:8px">'
-        +   '<span class="swatch" style="background:'+esc(cat.color)+'"></span>'
-        +   '<h4 style="margin:0">'+esc(cat.name)+'</h4>'
-        +   '<button class="btn ghost sm" data-pdfcat="'+cat.id+'" style="margin-left:auto">Selecionar categoria</button>'
-        + '</div>';
-      secs.forEach(function(sec){
-        var its = itemsOf(sec.id);
-        if(!its.length) return;
-        html += '<div class="sec">'
-          + '<div class="row" style="justify-content:space-between;margin-bottom:8px">'
-          +   '<strong style="font-family:var(--ff-d)">'+esc(sec.name)+'</strong>'
-          +   '<button class="btn ghost sm" data-pdfsec="'+sec.id+'">Selecionar seção</button>'
-          + '</div>'
-          + '<div class="items">'
-          + its.map(function(it){
-              var thumb = it.image_url
-                ? '<img src="'+esc(it.image_url)+'" class="thumb" alt="" />'
-                : '<div class="thumb"></div>';
-              return '<label class="item" style="cursor:pointer">'
-                + '<input type="checkbox" data-pdfitem="'+it.id+'" '+(pdfSelected(it.id)?"checked":"")+' />'
-                + thumb
-                + '<span class="grow">'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span>'
-                + '</label>';
-            }).join("")
-          + '</div></div>';
-      });
-      html += '</div>';
-    });
-    html += '</div>';
+    var mxq = (state._pdfMxQ||"").toLowerCase();
+    var mxItems = state.items.slice().sort(function(a,b){return (a.title||"").localeCompare(b.title||"","pt-BR");});
+    if(mxq) mxItems = mxItems.filter(function(it){return (it.title||"").toLowerCase().indexOf(mxq)>=0;});
+
+    var groupsHead = d.groups.map(function(g){
+      return '<th style="text-align:center;min-width:150px">'
+        + '<div class="row" style="gap:6px;justify-content:center;margin-bottom:6px;flex-wrap:nowrap">'
+        +   '<span class="swatch" id="sw-'+g.id+'" style="width:14px;height:14px;background:'+esc(g.color)+'"></span>'
+        +   '<select data-groupcolor="'+g.id+'" style="width:auto;font-size:.72rem;padding:3px 6px">'+colorOptions(g.color)+'</select>'
+        +   '<button class="icobtn" data-pdfgroupdel="'+g.id+'" title="Remover macro grupo" style="width:24px;height:24px;font-size:.85rem">✕</button>'
+        + '</div>'
+        + '<input type="text" data-groupname="'+g.id+'" value="'+esc(g.name)+'" style="text-align:center;font-weight:600" />'
+        + '</th>';
+    }).join("");
+
+    var mxRows = mxItems.length ? mxItems.map(function(it){
+      var thumb = it.image_url
+        ? '<img src="'+esc(it.image_url)+'" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover;flex:none" />'
+        : '<div style="width:34px;height:34px;border-radius:6px;background:#eef;flex:none"></div>';
+      var cells = d.groups.map(function(g){
+        var checked = g.itemIds.indexOf(it.id) >= 0;
+        return '<td style="text-align:center"><input type="checkbox" data-pdfitem="'+it.id+'" data-group="'+g.id+'" '+(checked?"checked":"")+' /></td>';
+      }).join("");
+      return '<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">'+thumb
+        + '<span class="mx-name" data-pdfview="'+it.id+'" title="Clique para ampliar a foto">'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span></div></td>'
+        + cells + '</tr>';
+    }).join("") : '<tr><td colspan="'+(d.groups.length+1)+'" class="muted">Nenhum item encontrado.</td></tr>';
+
+    html += '<div class="mx-bleed"><div class="card" style="margin-bottom:16px">'
+      + '<div class="row" style="justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px">'
+      +   '<div><h3 style="margin:0">Macro grupos e itens deste catálogo</h3>'
+      +   '<p class="muted" style="margin:4px 0 0">Crie os macro grupos, dê nome e cor, e marque quais brinquedos entram em cada um. Clique no nome de um item para ampliar a foto.</p></div>'
+      +   '<button class="btn g sm" id="pdf-group-add">+ Macro grupo</button>'
+      + '</div>'
+      + '<div style="margin-bottom:12px"><input type="text" id="pdf-mx-search" placeholder="Buscar por nome..." value="'+esc(state._pdfMxQ||"")+'" style="max-width:280px" /></div>'
+      + '<div id="pdfmx-scroll" style="overflow:auto;max-height:60vh"><table class="mx-table"><thead><tr><th>Brinquedo</th>'+groupsHead+'</tr></thead><tbody>'+mxRows+'</tbody></table></div>'
+      + '</div></div>';
 
     html += '<div class="card">'
       + '<button class="btn g" id="pdf-generate">Gerar PDF</button>'
@@ -806,49 +932,71 @@
 
     c.innerHTML = html;
 
-    document.getElementById("pdf-save-contact").onclick = savePdfContact;
-    document.getElementById("pdf-all").onclick = function(){ state.items.forEach(function(it){ setPdfSelected(it.id,true); }); renderPdfTab(); };
-    document.getElementById("pdf-none").onclick = function(){ state.items.forEach(function(it){ setPdfSelected(it.id,false); }); renderPdfTab(); };
+    document.getElementById("pdf-cat-select").onchange = function(e){
+      var id = e.target.value;
+      if(id === d.id) return;
+      var found = state._pdfCatalogs.find(function(x){return x.id===id;});
+      state._pdfDraft = found ? JSON.parse(JSON.stringify(found)) : pdfNewDraft();
+      renderPdfTab();
+    };
+    document.getElementById("pdf-cat-new").onclick = function(){ state._pdfDraft = pdfNewDraft(); renderPdfTab(); };
+    document.getElementById("pdf-cat-save").onclick = function(){ pdfSaveCurrent(false); };
+    document.getElementById("pdf-cat-saveas").onclick = function(){ pdfSaveCurrent(true); };
+    document.getElementById("pdf-cat-export").onclick = pdfExportJson;
+    document.getElementById("pdf-cat-importbtn").onclick = function(){ document.getElementById("pdf-cat-file").click(); };
+    document.getElementById("pdf-cat-file").onchange = pdfImportJsonChange;
+    document.getElementById("pdf-cat-delete").onclick = pdfDeleteCurrent;
+    document.getElementById("pdf-group-add").onclick = pdfAddGroup;
     document.getElementById("pdf-generate").onclick = generatePdf;
 
+    c.oninput = function(e){
+      var id = e.target.id;
+      if(id==="pdf-cat-name") d.name = e.target.value;
+      else if(id==="pdf-title") d.cover.title = e.target.value;
+      else if(id==="pdf-sub") d.cover.sub = e.target.value;
+      else if(id==="pdf-lead") d.cover.lead = e.target.value;
+      else if(id==="pdf-email") d.cover.email = e.target.value;
+      else if(id==="pdf-phone") d.cover.phone = e.target.value;
+      else if(id==="pdf-site") d.cover.site = e.target.value;
+      else if(e.target.dataset.groupname){
+        var g = d.groups.find(function(x){return x.id===e.target.dataset.groupname;});
+        if(g) g.name = e.target.value;
+      } else if(id==="pdf-mx-search"){
+        state._pdfMxQ = e.target.value;
+        var pos = e.target.selectionStart;
+        renderPdfTab();
+        var ni = document.getElementById("pdf-mx-search");
+        if(ni){ ni.focus(); try{ ni.setSelectionRange(pos,pos); }catch(_){ } }
+      }
+    };
     c.onchange = function(e){
       var cb = e.target.closest("[data-pdfitem]");
-      if(cb) setPdfSelected(cb.dataset.pdfitem, cb.checked);
+      if(cb){ pdfToggleItemInGroup(cb.dataset.group, cb.dataset.pdfitem, cb.checked); renderPdfTab(); return; }
+      var sel = e.target.closest("[data-groupcolor]");
+      if(sel){
+        var g = d.groups.find(function(x){return x.id===sel.dataset.groupcolor;});
+        if(g){ g.color = sel.value; var sw=document.getElementById("sw-"+g.id); if(sw) sw.style.background = g.color; }
+      }
     };
     c.onclick = function(e){
-      var catBtn = e.target.closest("[data-pdfcat]");
-      if(catBtn){
-        secsOf(catBtn.dataset.pdfcat).forEach(function(sec){
-          itemsOf(sec.id).forEach(function(it){ setPdfSelected(it.id,true); });
-        });
-        renderPdfTab(); return;
-      }
-      var secBtn = e.target.closest("[data-pdfsec]");
-      if(secBtn){
-        itemsOf(secBtn.dataset.pdfsec).forEach(function(it){ setPdfSelected(it.id,true); });
-        renderPdfTab(); return;
-      }
+      var view = e.target.closest("[data-pdfview]");
+      if(view){ openItemPreview(view.dataset.pdfview); return; }
+      var del = e.target.closest("[data-pdfgroupdel]");
+      if(del){ pdfRemoveGroup(del.dataset.pdfgroupdel); return; }
     };
-  }
 
-  async function savePdfContact(){
-    var r = await db.from("settings").update({
-      pdf_email: val("pdf-email"), pdf_phone_display: val("pdf-phone"), pdf_site_url: val("pdf-site"),
-      updated_at:new Date().toISOString()
-    }).eq("id",1);
-    if(r.error){ toast("Erro ao salvar contato."); return; }
-    await loadAll(); toast("Dados de contato salvos.");
+    var scrollWrap = document.getElementById("pdfmx-scroll");
+    if(scrollWrap){
+      scrollWrap.scrollTop = state._pdfMxScroll || 0;
+      scrollWrap.onscroll = function(){ state._pdfMxScroll = scrollWrap.scrollTop; };
+    }
   }
 
   function pdfCollectStructure(){
-    var out = [];
-    state.cats.forEach(function(cat){
-      var secs = [];
-      secsOf(cat.id).forEach(function(sec){
-        var its = itemsOf(sec.id).filter(function(it){ return pdfSelected(it.id); });
-        if(its.length) secs.push({sec:sec, items:its});
-      });
-      if(secs.length) out.push({cat:cat, secs:secs});
+    var d = state._pdfDraft, out = [];
+    d.groups.forEach(function(g){
+      var items = g.itemIds.map(function(id){ return state.items.find(function(x){return x.id===id;}); }).filter(Boolean);
+      if(items.length) out.push({group:g, items:items});
     });
     return out;
   }
@@ -877,6 +1025,48 @@
     });
   }
 
+  /* fontes da marca (Fredoka/Poppins) embutidas no PDF, buscadas do Google Fonts em tempo
+     de geração. Se falhar (sem internet, CORS, etc.), o PDF sai com a fonte padrão. */
+  async function ensureBrandFonts(){
+    if(PDF_FONTS_READY) return true;
+    try{
+      var css = await fetch("https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Poppins:wght@400;600&display=swap")
+        .then(function(r){ if(!r.ok) throw new Error("css http "+r.status); return r.text(); });
+      var re = /\/\* latin \*\/\s*@font-face\s*\{([^}]*)\}/g;
+      var faces = {}, m;
+      while((m = re.exec(css))){
+        var block = m[1];
+        var fam = (block.match(/font-family:\s*'([^']+)'/)||[])[1];
+        var wt = (block.match(/font-weight:\s*(\d+)/)||[])[1];
+        var url = (block.match(/url\(([^)]+)\)/)||[])[1];
+        if(fam && wt && url) faces[fam+"-"+wt] = url;
+      }
+      var need = {
+        "Fredoka-500":faces["Fredoka-500"], "Fredoka-600":faces["Fredoka-600"],
+        "Poppins-400":faces["Poppins-400"], "Poppins-600":faces["Poppins-600"]
+      };
+      if(!need["Fredoka-500"] || !need["Poppins-400"]) throw new Error("fontes não encontradas");
+
+      var vfs = pdfMake.vfs || {};
+      for(var key in need){
+        if(!need[key]) continue;
+        var buf = await fetch(need[key]).then(function(r){ if(!r.ok) throw new Error("font http "+r.status); return r.arrayBuffer(); });
+        var bytes = new Uint8Array(buf), bin = "";
+        for(var i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+        vfs[key+".ttf"] = btoa(bin);
+      }
+      pdfMake.vfs = vfs;
+      pdfMake.fonts = Object.assign({}, pdfMake.fonts, {
+        Fredoka:{ normal:"Fredoka-500.ttf", bold: need["Fredoka-600"]?"Fredoka-600.ttf":"Fredoka-500.ttf",
+          italics:"Fredoka-500.ttf", bolditalics: need["Fredoka-600"]?"Fredoka-600.ttf":"Fredoka-500.ttf" },
+        Poppins:{ normal:"Poppins-400.ttf", bold: need["Poppins-600"]?"Poppins-600.ttf":"Poppins-400.ttf",
+          italics:"Poppins-400.ttf", bolditalics: need["Poppins-600"]?"Poppins-600.ttf":"Poppins-400.ttf" }
+      });
+      PDF_FONTS_READY = true;
+      return true;
+    }catch(err){ return false; }
+  }
+
   function pdfItemCell(it, imgMap){
     var stack = [];
     var img = it.image_url ? imgMap[it.image_url] : null;
@@ -886,69 +1076,55 @@
     return {stack: stack, margin:[8,8,8,16]};
   }
 
-  function buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite){
+  function buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite, fontsOk){
     var PW = 595.28, PH = 841.89;
     var content = [];
+    var F_DISPLAY = fontsOk ? "Fredoka" : "Roboto";
+    var F_TEXT = fontsOk ? "Poppins" : "Roboto";
+
+    var zigzag = { canvas:[
+      {type:"line", x1:0,y1:16, x2:70,y2:0, lineWidth:5, lineColor:"#FF8736", lineCap:"round"},
+      {type:"line", x1:70,y1:0, x2:140,y2:16, lineWidth:5, lineColor:"#F94262", lineCap:"round"},
+      {type:"line", x1:140,y1:16, x2:210,y2:0, lineWidth:5, lineColor:"#5F94DA", lineCap:"round"},
+      {type:"line", x1:210,y1:0, x2:280,y2:16, lineWidth:5, lineColor:"#FDBF35", lineCap:"round"}
+    ], alignment:"center", margin:[0,4,0,4] };
 
     /* ---------- capa ---------- */
-    var stripe = { columns: [
-      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#FF8736"}]},
-      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#F94262"}]},
-      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#5F94DA"}]}
-    ], columnGap:0, margin:[60,0,60,0] };
-
-    var coverStack = [{text:"", margin:[0,70,0,0]}];
-    if(logoColor) coverStack.push({image:logoColor, width:170, alignment:"center", margin:[0,0,0,26]});
+    var coverStack = [{text:"", margin:[0,44,0,0]}];
+    coverStack.push({text:"catálogo de produtos", style:"eyebrow", alignment:"center"});
+    if(logoColor) coverStack.push({image:logoColor, width:150, alignment:"center", margin:[0,14,0,22]});
     coverStack.push({text: cfg.title, style:"coverTitle", alignment:"center"});
-    if(cfg.sub) coverStack.push({text: cfg.sub, style:"coverSub", alignment:"center", margin:[0,6,0,20]});
-    coverStack.push(stripe);
-    coverStack.push({text:"Catálogo de mobiliário e brinquedos lúdicos para escolas, clínicas, buffets e espaços de brincar.",
-      alignment:"center", style:"coverLead", margin:[60,26,60,0]});
-    coverStack.push({text:"Catálogo gerado em "+new Date().toLocaleDateString("pt-BR"), alignment:"center", style:"coverDate", margin:[0,70,0,0]});
+    if(cfg.sub) coverStack.push({text: cfg.sub, style:"coverSub", alignment:"center", margin:[0,8,0,18]});
+    coverStack.push(zigzag);
+    if(cfg.lead) coverStack.push({text: cfg.lead, alignment:"center", style:"coverLead", margin:[64,20,64,0]});
+    coverStack.push({text:"Catálogo gerado em "+new Date().toLocaleDateString("pt-BR"), alignment:"center", style:"coverDate", margin:[0,90,0,0]});
     content.push({ stack: coverStack });
 
     /* ---------- índice ---------- */
     content.push({ text:"Índice", style:"tocTitle", pageBreak:"before" });
-    content.push({ toc: { textStyle:"tocEntry", numberStyle:"tocEntry" } });
+    content.push({ toc:{ textStyle:"tocEntry", numberStyle:"tocEntry" } });
 
-    /* ---------- categorias / seções / itens ---------- */
+    /* ---------- macro grupos / itens ---------- */
     structure.forEach(function(g){
       content.push({
         table:{ widths:["*"], body:[[
-          {text:g.cat.name, style:"catTitle", fillColor:g.cat.color, tocItem:true, margin:[14,10,14,10]}
+          {text:g.group.name, style:"groupTitle", fillColor:g.group.color, tocItem:true, margin:[16,12,16,12]}
         ]] },
-        layout:"noBorders",
-        pageBreak:"before",
-        margin:[0,0,0,14]
+        layout:"noBorders", pageBreak:"before", margin:[0,0,0,16]
       });
-
-      g.secs.forEach(function(sg){
-        content.push({
-          table:{ widths:["*"], body:[[
-            {text:sg.sec.name, style:"secTitle", fillColor: sg.sec.color||g.cat.color, tocItem:true, tocMargin:[10,0,0,0], margin:[12,7,12,7]}
-          ]] },
-          layout:"noBorders",
-          margin:[0,10,0,10]
-        });
-
-        var rows = [];
-        for(var i=0;i<sg.items.length;i+=2){
-          var a = sg.items[i], b = sg.items[i+1];
-          rows.push([ pdfItemCell(a, imgMap), b?pdfItemCell(b, imgMap):{text:""} ]);
-        }
-        content.push({ table:{ widths:["*","*"], body: rows }, layout:"noBorders" });
-      });
+      var rows = [];
+      for(var i=0;i<g.items.length;i+=2){
+        var a=g.items[i], b=g.items[i+1];
+        rows.push([ pdfItemCell(a, imgMap), b?pdfItemCell(b, imgMap):{text:""} ]);
+      }
+      content.push({ table:{ widths:["*","*"], body: rows }, layout:"noBorders" });
     });
 
     /* ---------- última página ---------- */
-    content.push({
-      canvas:[{type:"rect", x:0, y:0, w:PW, h:PH, color:"#373A81"}],
-      absolutePosition:{x:0,y:0},
-      pageBreak:"before"
-    });
-    var closing = [{text:"", margin:[0,80,0,0]}];
-    if(logoWhite) closing.push({image:logoWhite, width:150, alignment:"center", margin:[0,0,0,18]});
-    closing.push({text:"Use com carinho. Crie com propósito. Encante com identidade.", style:"closeTag", alignment:"center", margin:[40,0,40,40]});
+    content.push({ canvas:[{type:"rect", x:0,y:0, w:PW, h:PH, color:"#373A81"}], absolutePosition:{x:0,y:0}, pageBreak:"before" });
+    var closing = [{text:"", margin:[0,90,0,0]}];
+    if(logoWhite) closing.push({image:logoWhite, width:140, alignment:"center", margin:[0,0,0,20]});
+    closing.push({text:"Use com carinho. Crie com propósito. Encante com identidade.", style:"closeTag", alignment:"center", margin:[50,0,50,44]});
     if(cfg.phone) closing.push({text:[{text:"WhatsApp   ", style:"closeLabel"},{text:cfg.phone, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
     if(cfg.email) closing.push({text:[{text:"E-mail   ", style:"closeLabel"},{text:cfg.email, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
     if(cfg.site) closing.push({text:[{text:"Site   ", style:"closeLabel"},{text:cfg.site, style:"closeVal"}], alignment:"center"});
@@ -959,36 +1135,38 @@
       pageMargins:[40,50,40,50],
       content: content,
       styles:{
-        coverTitle:{fontSize:30, bold:true, color:"#373A81"},
-        coverSub:{fontSize:14, color:"#373A81"},
-        coverLead:{fontSize:11, color:"#6a6ca6"},
-        coverDate:{fontSize:9, color:"#a9abcf"},
-        tocTitle:{fontSize:22, bold:true, color:"#373A81", margin:[0,0,0,16]},
-        tocEntry:{fontSize:11, color:"#373A81"},
-        catTitle:{fontSize:18, bold:true, color:"#ffffff"},
-        secTitle:{fontSize:13, bold:true, color:"#ffffff"},
-        itemTitle:{fontSize:11, bold:true, color:"#373A81"},
-        itemDesc:{fontSize:9, color:"#6a6ca6"},
-        closeTag:{fontSize:11, color:"#e7e8fa"},
-        closeLabel:{fontSize:11, bold:true, color:"#ffffff"},
-        closeVal:{fontSize:11, color:"#e7e8fa"}
+        eyebrow:{fontSize:10, color:"#01ACBE", bold:true, font:F_DISPLAY},
+        coverTitle:{fontSize:32, bold:true, color:"#373A81", font:F_DISPLAY},
+        coverSub:{fontSize:15, color:"#F94262", font:F_DISPLAY},
+        coverLead:{fontSize:11, color:"#6a6ca6", font:F_TEXT},
+        coverDate:{fontSize:9, color:"#a9abcf", font:F_TEXT},
+        tocTitle:{fontSize:22, bold:true, color:"#373A81", margin:[0,0,0,16], font:F_DISPLAY},
+        tocEntry:{fontSize:11, color:"#373A81", font:F_TEXT},
+        groupTitle:{fontSize:18, bold:true, color:"#ffffff", font:F_DISPLAY},
+        itemTitle:{fontSize:11, bold:true, color:"#373A81", font:F_DISPLAY},
+        itemDesc:{fontSize:9, color:"#6a6ca6", font:F_TEXT},
+        closeTag:{fontSize:11, color:"#e7e8fa", font:F_TEXT},
+        closeLabel:{fontSize:11, bold:true, color:"#ffffff", font:F_DISPLAY},
+        closeVal:{fontSize:11, color:"#e7e8fa", font:F_TEXT}
       },
-      defaultStyle:{ font:"Roboto" }
+      defaultStyle:{ font:F_TEXT }
     };
   }
 
   async function generatePdf(){
     var structure = pdfCollectStructure();
-    if(!structure.length){ toast("Selecione ao menos um item para gerar o PDF."); return; }
+    if(!structure.length){ toast("Marque ao menos um item em algum macro grupo para gerar o PDF."); return; }
     var status = document.getElementById("pdf-status");
     var btn = document.getElementById("pdf-generate");
-    btn.disabled = true; status.textContent = "Preparando imagens…";
+    btn.disabled = true; status.textContent = "Carregando fontes da marca…";
 
+    var fontsOk = await ensureBrandFonts();
+
+    status.textContent = "Preparando imagens…";
     var urls = [];
-    structure.forEach(function(g){ g.secs.forEach(function(sg){ sg.items.forEach(function(it){
+    structure.forEach(function(g){ g.items.forEach(function(it){
       if(it.image_url && urls.indexOf(it.image_url)===-1) urls.push(it.image_url);
-    }); }); });
-
+    }); });
     var imgMap = {};
     for(var i=0;i<urls.length;i++){
       status.textContent = "Preparando imagens… ("+(i+1)+"/"+urls.length+")";
@@ -999,18 +1177,12 @@
     var logoColor = await fetchImageDataUrl("logo-color.png", 600);
     var logoWhite = await fetchImageDataUrl("logo-white.png", 600);
 
-    var cfg = {
-      title: val("pdf-title") || "Casa Lúdica Moema",
-      sub: val("pdf-sub") || "",
-      email: val("pdf-email") || "",
-      phone: val("pdf-phone") || "",
-      site: val("pdf-site") || ""
-    };
+    var cfg = state._pdfDraft.cover;
 
     try{
-      var doc = buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite);
-      pdfMake.createPdf(doc).download("catalogo-casa-ludica-moema.pdf");
-      toast("PDF gerado!");
+      var doc = buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite, fontsOk);
+      pdfMake.createPdf(doc).download((slugify(state._pdfDraft.name||"catalogo")||"catalogo")+".pdf");
+      toast(fontsOk ? "PDF gerado!" : "PDF gerado (sem acesso às fontes da marca agora — usei a fonte padrão).");
     }catch(err){
       toast("Erro ao gerar PDF.");
     }
