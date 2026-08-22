@@ -105,6 +105,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
+<script src="pdf-fonts.js"></script>
 <script>
 (function(){
   "use strict";
@@ -729,7 +730,6 @@
 
   /* ============================ CATÁLOGO PDF ============================ */
   var PDF_LS_KEY = "clm_pdf_catalogs_v1";
-  var PDF_FONTS_READY = false;
 
   function pdfLoadCatalogs(){
     try{ return JSON.parse(localStorage.getItem(PDF_LS_KEY)) || []; }catch(e){ return []; }
@@ -749,9 +749,14 @@
       cover:{
         title: s.hero_title || "Casa Lúdica Moema",
         sub: s.hero_slogan || "Juntos por uma infância + lúdica",
-        lead: "Mobiliário e brinquedos lúdicos sob medida para escolas, clínicas, buffets e espaços de brincar.",
+        lead: "Mobiliário e brinquedos lúdicos sob encomenda para escolas, clínicas, buffets e espaços de brincar.",
+        tagline: "Use com carinho. Crie com propósito. Encante com identidade.",
+        toc: true,
+        how: true,
         email: s.pdf_email || "",
         phone: s.pdf_phone_display || "",
+        instagram: s.pdf_instagram || "@casaludicamoema",
+        whatsapp: s.whatsapp_url || "",
         site: s.pdf_site_url || "casaludicamoema.com.br"
       },
       groups: [ {id:"g_"+Date.now(), name:"Grupo 1", color: PALETTE[0]?PALETTE[0].hex:"#373A81", itemIds:[]} ]
@@ -869,7 +874,14 @@
       +     '<button class="btn r sm" id="pdf-cat-delete">Excluir</button>'
       +   '</div>'
       + '</div>'
-      + '<p class="muted" style="margin:10px 0 0">'+esc(meta)+'</p>'
+      + '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:14px;'
+      +   'padding-top:14px;border-top:1px solid var(--linha)">'
+      +   '<p class="muted" style="margin:0">'+esc(meta)+'</p>'
+      +   '<div class="row" style="gap:10px">'
+      +     '<span id="pdf-status" class="muted"></span>'
+      +     '<button class="btn g" id="pdf-generate">Gerar PDF</button>'
+      +   '</div>'
+      + '</div>'
       + '</div>';
 
     html += '<div class="card" style="margin-bottom:16px">'
@@ -879,12 +891,28 @@
       +   '<div><label>Título da capa</label><input type="text" id="pdf-title" value="'+esc(d.cover.title)+'" /></div>'
       +   '<div><label>Subtítulo da capa</label><input type="text" id="pdf-sub" value="'+esc(d.cover.sub)+'" /></div>'
       + '</div>'
-      + '<div style="margin-top:12px"><label>Texto de abertura</label><textarea id="pdf-lead" rows="2">'+esc(d.cover.lead)+'</textarea></div>'
+      + '<div style="margin-top:12px"><label>Texto de abertura (capa)</label><textarea id="pdf-lead" rows="2">'+esc(d.cover.lead)+'</textarea></div>'
+      + '<div style="margin-top:12px"><label>Frase de encerramento (última página)</label><textarea id="pdf-tagline" rows="2">'+esc(d.cover.tagline||"")+'</textarea></div>'
+      + '<div class="row" style="margin-top:14px;gap:22px">'
+      +   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem;color:var(--tinta)">'
+      +     '<input type="checkbox" id="pdf-how" '+(d.cover.how!==false?"checked":"")+' style="width:17px;height:17px" />'
+      +     'Incluir página "Como funciona"'
+      +   '</label>'
+      +   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem;color:var(--tinta)">'
+      +     '<input type="checkbox" id="pdf-toc" '+(d.cover.toc!==false?"checked":"")+' style="width:17px;height:17px" />'
+      +     'Incluir página de índice'
+      +   '</label>'
+      + '</div>'
       + '<div class="grid2" style="margin-top:12px">'
       +   '<div><label>E-mail de contato (última página)</label><input type="text" id="pdf-email" value="'+esc(d.cover.email)+'" placeholder="contato@casaludicamoema.com.br" /></div>'
-      +   '<div><label>WhatsApp exibido (última página)</label><input type="text" id="pdf-phone" value="'+esc(d.cover.phone)+'" placeholder="(11) 99999-9999" /></div>'
+      +   '<div><label>WhatsApp exibido (capa e última página)</label><input type="text" id="pdf-phone" value="'+esc(d.cover.phone)+'" placeholder="(11) 99999-9999" /></div>'
       + '</div>'
-      + '<div style="margin-top:12px"><label>Site (última página)</label><input type="text" id="pdf-site" value="'+esc(d.cover.site)+'" /></div>'
+      + '<div style="margin-top:12px"><label>Link do WhatsApp (opcional — se vazio, é montado a partir do número)</label>'
+      +   '<input type="text" id="pdf-whatsapp" value="'+esc(d.cover.whatsapp||"")+'" placeholder="https://wa.me/5511999999999" /></div>'
+      + '<div class="grid2" style="margin-top:12px">'
+      +   '<div><label>Instagram (capa e última página)</label><input type="text" id="pdf-instagram" value="'+esc(d.cover.instagram||"")+'" placeholder="@casaludicamoema" /></div>'
+      +   '<div><label>Site (capa e última página)</label><input type="text" id="pdf-site" value="'+esc(d.cover.site)+'" /></div>'
+      + '</div>'
       + '</div>';
 
     var mxq = (state._pdfMxQ||"").toLowerCase();
@@ -925,11 +953,6 @@
       + '<div id="pdfmx-scroll" style="overflow:auto;max-height:60vh"><table class="mx-table"><thead><tr><th>Brinquedo</th>'+groupsHead+'</tr></thead><tbody>'+mxRows+'</tbody></table></div>'
       + '</div></div>';
 
-    html += '<div class="card">'
-      + '<button class="btn g" id="pdf-generate">Gerar PDF</button>'
-      + '<span id="pdf-status" class="muted" style="margin-left:12px"></span>'
-      + '</div>';
-
     c.innerHTML = html;
 
     document.getElementById("pdf-cat-select").onchange = function(e){
@@ -955,8 +978,11 @@
       else if(id==="pdf-title") d.cover.title = e.target.value;
       else if(id==="pdf-sub") d.cover.sub = e.target.value;
       else if(id==="pdf-lead") d.cover.lead = e.target.value;
+      else if(id==="pdf-tagline") d.cover.tagline = e.target.value;
       else if(id==="pdf-email") d.cover.email = e.target.value;
       else if(id==="pdf-phone") d.cover.phone = e.target.value;
+      else if(id==="pdf-instagram") d.cover.instagram = e.target.value;
+      else if(id==="pdf-whatsapp") d.cover.whatsapp = e.target.value;
       else if(id==="pdf-site") d.cover.site = e.target.value;
       else if(e.target.dataset.groupname){
         var g = d.groups.find(function(x){return x.id===e.target.dataset.groupname;});
@@ -970,6 +996,8 @@
       }
     };
     c.onchange = function(e){
+      if(e.target.id === "pdf-toc"){ d.cover.toc = e.target.checked; return; }
+      if(e.target.id === "pdf-how"){ d.cover.how = e.target.checked; return; }
       var cb = e.target.closest("[data-pdfitem]");
       if(cb){ pdfToggleItemInGroup(cb.dataset.group, cb.dataset.pdfitem, cb.checked); renderPdfTab(); return; }
       var sel = e.target.closest("[data-groupcolor]");
@@ -1025,132 +1053,233 @@
     });
   }
 
-  /* fontes da marca (Fredoka/Poppins) embutidas no PDF, buscadas do Google Fonts em tempo
-     de geração. Se falhar (sem internet, CORS, etc.), o PDF sai com a fonte padrão. */
-  async function ensureBrandFonts(){
-    if(PDF_FONTS_READY) return true;
-    try{
-      var css = await fetch("https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Poppins:wght@400;600&display=swap")
-        .then(function(r){ if(!r.ok) throw new Error("css http "+r.status); return r.text(); });
-      var re = /\/\* latin \*\/\s*@font-face\s*\{([^}]*)\}/g;
-      var faces = {}, m;
-      while((m = re.exec(css))){
-        var block = m[1];
-        var fam = (block.match(/font-family:\s*'([^']+)'/)||[])[1];
-        var wt = (block.match(/font-weight:\s*(\d+)/)||[])[1];
-        var url = (block.match(/url\(([^)]+)\)/)||[])[1];
-        if(fam && wt && url) faces[fam+"-"+wt] = url;
-      }
-      var need = {
-        "Fredoka-500":faces["Fredoka-500"], "Fredoka-600":faces["Fredoka-600"],
-        "Poppins-400":faces["Poppins-400"], "Poppins-600":faces["Poppins-600"]
-      };
-      if(!need["Fredoka-500"] || !need["Poppins-400"]) throw new Error("fontes não encontradas");
-
-      var vfs = pdfMake.vfs || {};
-      for(var key in need){
-        if(!need[key]) continue;
-        var buf = await fetch(need[key]).then(function(r){ if(!r.ok) throw new Error("font http "+r.status); return r.arrayBuffer(); });
-        var bytes = new Uint8Array(buf), bin = "";
-        for(var i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
-        vfs[key+".ttf"] = btoa(bin);
-      }
-      pdfMake.vfs = vfs;
-      pdfMake.fonts = Object.assign({}, pdfMake.fonts, {
-        Fredoka:{ normal:"Fredoka-500.ttf", bold: need["Fredoka-600"]?"Fredoka-600.ttf":"Fredoka-500.ttf",
-          italics:"Fredoka-500.ttf", bolditalics: need["Fredoka-600"]?"Fredoka-600.ttf":"Fredoka-500.ttf" },
-        Poppins:{ normal:"Poppins-400.ttf", bold: need["Poppins-600"]?"Poppins-600.ttf":"Poppins-400.ttf",
-          italics:"Poppins-400.ttf", bolditalics: need["Poppins-600"]?"Poppins-600.ttf":"Poppins-400.ttf" }
-      });
-      PDF_FONTS_READY = true;
-      return true;
-    }catch(err){ return false; }
+  /* Fredoka + Poppins (subset latin) vêm de pdf-fonts.js e são embutidas no PDF. */
+  var BRAND_FONTS_READY = false;
+  function registerBrandFonts(){
+    if(BRAND_FONTS_READY) return true;
+    var f = window.CASA_PDF_FONTS;
+    if(!f || !f["Fredoka-500.ttf"] || !f["Poppins-400.ttf"]) return false;
+    pdfMake.vfs = Object.assign({}, pdfMake.vfs || {}, f);
+    pdfMake.fonts = Object.assign({}, pdfMake.fonts, {
+      Fredoka:{ normal:"Fredoka-500.ttf", bold:"Fredoka-600.ttf",
+                italics:"Fredoka-500.ttf", bolditalics:"Fredoka-600.ttf" },
+      Poppins:{ normal:"Poppins-400.ttf", bold:"Poppins-600.ttf",
+                italics:"Poppins-400.ttf", bolditalics:"Poppins-600.ttf" }
+    });
+    BRAND_FONTS_READY = true;
+    return true;
   }
 
-  function pdfItemCell(it, imgMap){
-    var stack = [];
-    var img = it.image_url ? imgMap[it.image_url] : null;
-    if(img) stack.push({image:img, fit:[150,150], alignment:"center", margin:[0,0,0,6]});
-    stack.push({text: it.title||"", style:"itemTitle", alignment:"center"});
-    if(it.description) stack.push({text: it.description, style:"itemDesc", alignment:"center"});
-    return {stack: stack, margin:[8,8,8,16]};
+  function waLink(cfg){
+    if(cfg.whatsapp) return cfg.whatsapp;
+    var d = String(cfg.phone||"").replace(/\D/g,"");
+    if(!d) return undefined;
+    if(d.length <= 11) d = "55" + d;
+    return "https://wa.me/" + d;
+  }
+  function igLink(handle){
+    var h = String(handle||"").trim().replace(/^@/,"");
+    return h ? "https://instagram.com/" + h : undefined;
+  }
+  function siteLink(site){
+    var u = String(site||"").trim();
+    if(!u) return undefined;
+    return /^https?:\/\//i.test(u) ? u : "https://" + u;
   }
 
-  function buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite, fontsOk){
+  function buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite){
     var PW = 595.28, PH = 841.89;
+    var C = { noite:"#373A81", agua:"#01ACBE", laranja:"#FF8736", rosa:"#F94262",
+              azul:"#5F94DA", amarelo:"#FDBF35", suave:"#6a6ca6", tint:"#EAF7F9" };
     var content = [];
-    var F_DISPLAY = fontsOk ? "Fredoka" : "Roboto";
-    var F_TEXT = fontsOk ? "Poppins" : "Roboto";
 
-    var zigzag = { canvas:[
-      {type:"line", x1:0,y1:16, x2:70,y2:0, lineWidth:5, lineColor:"#FF8736", lineCap:"round"},
-      {type:"line", x1:70,y1:0, x2:140,y2:16, lineWidth:5, lineColor:"#F94262", lineCap:"round"},
-      {type:"line", x1:140,y1:16, x2:210,y2:0, lineWidth:5, lineColor:"#5F94DA", lineCap:"round"},
-      {type:"line", x1:210,y1:0, x2:280,y2:16, lineWidth:5, lineColor:"#FDBF35", lineCap:"round"}
-    ], alignment:"center", margin:[0,4,0,4] };
+    /* ---------------- CAPA ---------------- */
+    var PEAK = 58, EAVE = 205;
+    content.push({ absolutePosition:{x:0,y:0}, canvas:[
+      { type:"polyline", closePath:true, color:C.tint,
+        points:[{x:0,y:EAVE},{x:PW/2,y:PEAK},{x:PW,y:EAVE},{x:PW,y:PH},{x:0,y:PH}] },
+      { type:"polyline", lineColor:C.laranja, lineWidth:6, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:EAVE},{x:PW/2,y:PEAK},{x:PW,y:EAVE}] },
+      { type:"polyline", lineColor:C.rosa, lineWidth:5, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:EAVE-16},{x:PW/2,y:PEAK-16},{x:PW,y:EAVE-16}] },
+      { type:"polyline", lineColor:C.azul, lineWidth:4, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:EAVE-30},{x:PW/2,y:PEAK-30},{x:PW,y:EAVE-30}] },
+      { type:"rect", x:0, y:PH-118, w:PW, h:118, color:C.noite }
+    ]});
 
-    /* ---------- capa ---------- */
-    var coverStack = [{text:"", margin:[0,44,0,0]}];
-    coverStack.push({text:"catálogo de produtos", style:"eyebrow", alignment:"center"});
-    if(logoColor) coverStack.push({image:logoColor, width:150, alignment:"center", margin:[0,14,0,22]});
-    coverStack.push({text: cfg.title, style:"coverTitle", alignment:"center"});
-    if(cfg.sub) coverStack.push({text: cfg.sub, style:"coverSub", alignment:"center", margin:[0,8,0,18]});
-    coverStack.push(zigzag);
-    if(cfg.lead) coverStack.push({text: cfg.lead, alignment:"center", style:"coverLead", margin:[64,20,64,0]});
-    coverStack.push({text:"Catálogo gerado em "+new Date().toLocaleDateString("pt-BR"), alignment:"center", style:"coverDate", margin:[0,90,0,0]});
-    content.push({ stack: coverStack });
+    var cover = [{ text:"", margin:[0,236,0,0] }];
+    if(logoColor) cover.push({ image:logoColor, width:132, alignment:"center", margin:[0,0,0,26] });
+    cover.push({ text:cfg.title||"", style:"coverTitle", alignment:"center" });
+    if(cfg.sub) cover.push({ text:cfg.sub, style:"coverSub", alignment:"center", margin:[0,8,0,0] });
+    cover.push({ columns:[
+      {width:"*", text:""},
+      {width:34, canvas:[{type:"rect",x:0,y:0,w:34,h:5,r:2.5,color:C.laranja}]},
+      {width:34, canvas:[{type:"rect",x:0,y:0,w:34,h:5,r:2.5,color:C.rosa}]},
+      {width:34, canvas:[{type:"rect",x:0,y:0,w:34,h:5,r:2.5,color:C.azul}]},
+      {width:34, canvas:[{type:"rect",x:0,y:0,w:34,h:5,r:2.5,color:C.amarelo}]},
+      {width:"*", text:""}
+    ], columnGap:7, margin:[0,22,0,0] });
+    if(cfg.lead) cover.push({ text:cfg.lead, style:"coverLead", alignment:"center", margin:[72,24,72,0] });
+    content.push({ stack:cover });
 
-    /* ---------- índice ---------- */
-    content.push({ text:"Índice", style:"tocTitle", pageBreak:"before" });
-    content.push({ toc:{ textStyle:"tocEntry", numberStyle:"tocEntry" } });
+    var sep = { text:"   ·   ", style:"coverContact" };
+    var contato = [];
+    if(cfg.phone) contato.push({ text:cfg.phone, style:"coverContact", link:waLink(cfg) });
+    if(cfg.instagram){ if(contato.length) contato.push(sep);
+      contato.push({ text:cfg.instagram, style:"coverContact", link:igLink(cfg.instagram) }); }
+    if(cfg.site){ if(contato.length) contato.push(sep);
+      contato.push({ text:cfg.site, style:"coverContact", link:siteLink(cfg.site) }); }
+    content.push({ absolutePosition:{x:0,y:PH-112}, width:PW, alignment:"center", stack:[
+      { text:"CATÁLOGO DE PRODUTOS", style:"coverKicker", alignment:"center" },
+      { text:contato, alignment:"center", margin:[0,9,0,0] },
+      { text:"gerado em "+new Date().toLocaleDateString("pt-BR"),
+        style:"coverMeta", alignment:"center", margin:[0,4,0,0] }
+    ]});
 
-    /* ---------- macro grupos / itens ---------- */
+    /* ---------------- COMO FUNCIONA ---------------- */
+    function step(num, cor, titulo, texto){
+      return { columns:[
+        { width:32, stack:[
+          { canvas:[{type:"ellipse", x:16,y:16, r1:16,r2:16, color:"#ffffff"}] },
+          { text:String(num), style:"stepNum", color:cor, alignment:"center",
+            relativePosition:{x:0,y:-25.5} }
+        ]},
+        { width:"*", stack:[
+          { text:titulo, style:"stepTitle" },
+          { text:texto, style:"stepText", margin:[0,3,0,0] }
+        ], margin:[18,3,0,0] }
+      ], margin:[0,0,0,20] };
+    }
+    if(cfg.how){
+    content.push({ absolutePosition:{x:0,y:0}, pageBreak:"before",
+      canvas:[{type:"rect", x:0,y:0, w:PW, h:PH, color:C.agua}] });
+    var howTop = [{ text:"", margin:[0,46,0,0] }];
+    if(logoWhite) howTop.push({ image:logoWhite, width:104, alignment:"center", margin:[0,0,0,24] });
+    content.push({ stack: howTop.concat([
+      { text:"COMO FUNCIONA", style:"howKicker", alignment:"center" },
+      { text:"Do catálogo ao orçamento", style:"howTitle", alignment:"center", margin:[0,8,0,0] },
+      { text:"Monte o ambiente ideal para o seu negócio em 3 passos simples.",
+        style:"howLead", alignment:"center", margin:[70,10,70,0] },
+      { stack:[
+          step(1, C.laranja, "Inspire-se", "Veja nosso catálogo e escolha os móveis e recursos ideais para o seu espaço."),
+          step(2, C.rosa, "Personalize", "Chame a gente no WhatsApp e envie as informações e necessidades do seu ambiente."),
+          step(3, C.amarelo, "Orçamento", "Receba uma proposta sob medida, com valores e prazo de entrega.")
+        ], margin:[54,44,54,0] },
+      { stack:[
+          { canvas:[{type:"rect", x:0,y:0, w:340,h:46, r:23, color:"#ffffff"}] },
+          { text:(cfg.phone ? "Fale com a gente: "+cfg.phone : "Fale com a gente no WhatsApp"),
+            style:"howCta", alignment:"center", width:340, link:waLink(cfg),
+            relativePosition:{x:0,y:-31} }
+        ], alignment:"center", margin:[87,30,88,0] }
+    ])});
+    content.push({ absolutePosition:{x:0,y:0}, canvas:[
+      { type:"polyline", lineColor:"#57C8D6", lineWidth:6, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-104},{x:PW/2,y:PH-216},{x:PW,y:PH-104}] },
+      { type:"polyline", lineColor:"#84D8E2", lineWidth:5, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-88},{x:PW/2,y:PH-200},{x:PW,y:PH-88}] },
+      { type:"polyline", lineColor:"#B0E7ED", lineWidth:4, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-74},{x:PW/2,y:PH-186},{x:PW,y:PH-74}] }
+    ]});
+    }
+
+    /* ---------------- ÍNDICE ---------------- */
+    if(cfg.toc){
+      content.push({ text:"Índice", style:"tocTitle", pageBreak:"before" });
+      content.push({ columns:[
+        {width:56, canvas:[{type:"rect",x:0,y:0,w:56,h:4,r:2,color:C.agua}]},
+        {width:"*", text:""}
+      ], margin:[0,0,0,22] });
+      content.push({ toc:{ textStyle:"tocEntry", numberStyle:"tocEntry" } });
+    }
+
+    /* ---------------- MACRO GRUPOS ---------------- */
     structure.forEach(function(g){
-      content.push({
+      content.push({ pageBreak:"before", margin:[0,0,0,20], layout:"noBorders",
         table:{ widths:["*"], body:[[
-          {text:g.group.name, style:"groupTitle", fillColor:g.group.color, tocItem:true, margin:[16,12,16,12]}
-        ]] },
-        layout:"noBorders", pageBreak:"before", margin:[0,0,0,16]
-      });
+          { fillColor:g.group.color, margin:[18,15,18,15],
+            text:g.group.name, style:"groupTitle", tocItem:cfg.toc?true:undefined }
+        ]] } });
       var rows = [];
       for(var i=0;i<g.items.length;i+=2){
-        var a=g.items[i], b=g.items[i+1];
-        rows.push([ pdfItemCell(a, imgMap), b?pdfItemCell(b, imgMap):{text:""} ]);
+        rows.push([ pdfItemCell(g.items[i], imgMap, g.group.color),
+                    g.items[i+1] ? pdfItemCell(g.items[i+1], imgMap, g.group.color) : {text:""} ]);
       }
-      content.push({ table:{ widths:["*","*"], body: rows }, layout:"noBorders" });
+      content.push({ table:{ widths:["*","*"], body:rows }, layout:"noBorders" });
     });
 
-    /* ---------- última página ---------- */
-    content.push({ canvas:[{type:"rect", x:0,y:0, w:PW, h:PH, color:"#373A81"}], absolutePosition:{x:0,y:0}, pageBreak:"before" });
-    var closing = [{text:"", margin:[0,90,0,0]}];
-    if(logoWhite) closing.push({image:logoWhite, width:140, alignment:"center", margin:[0,0,0,20]});
-    closing.push({text:"Use com carinho. Crie com propósito. Encante com identidade.", style:"closeTag", alignment:"center", margin:[50,0,50,44]});
-    if(cfg.phone) closing.push({text:[{text:"WhatsApp   ", style:"closeLabel"},{text:cfg.phone, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
-    if(cfg.email) closing.push({text:[{text:"E-mail   ", style:"closeLabel"},{text:cfg.email, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
-    if(cfg.site) closing.push({text:[{text:"Site   ", style:"closeLabel"},{text:cfg.site, style:"closeVal"}], alignment:"center"});
-    content.push({ stack: closing });
+    /* ---------------- ÚLTIMA PÁGINA ---------------- */
+    content.push({ absolutePosition:{x:0,y:0}, pageBreak:"before", canvas:[
+      { type:"rect", x:0,y:0, w:PW, h:PH, color:C.noite },
+      { type:"polyline", lineColor:C.laranja, lineWidth:6, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-150},{x:PW/2,y:PH-262},{x:PW,y:PH-150}] },
+      { type:"polyline", lineColor:C.rosa, lineWidth:5, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-134},{x:PW/2,y:PH-246},{x:PW,y:PH-134}] },
+      { type:"polyline", lineColor:C.azul, lineWidth:4, lineCap:"round", lineJoin:"round",
+        points:[{x:0,y:PH-120},{x:PW/2,y:PH-232},{x:PW,y:PH-120}] }
+    ]});
+    var closing = [{ text:"", margin:[0,120,0,0] }];
+    if(logoWhite) closing.push({ image:logoWhite, width:150, alignment:"center", margin:[0,0,0,22] });
+    if(cfg.tagline) closing.push({ text:cfg.tagline, style:"closeTag", alignment:"center", margin:[64,0,64,46] });
+    function linha(rot, valor, href){
+      return { columns:[
+        {width:"*", text:""},
+        {width:"auto", text:rot, style:"closeLabel"},
+        {width:"auto", text:valor, style:"closeVal", link:href, margin:[10,0,0,0]},
+        {width:"*", text:""}
+      ], margin:[0,0,0,11] };
+    }
+    if(cfg.phone) closing.push(linha("WHATSAPP", cfg.phone, waLink(cfg)));
+    if(cfg.email) closing.push(linha("E-MAIL", cfg.email, "mailto:"+cfg.email));
+    if(cfg.instagram) closing.push(linha("INSTAGRAM", cfg.instagram, igLink(cfg.instagram)));
+    if(cfg.site)  closing.push(linha("SITE", cfg.site, siteLink(cfg.site)));
+    content.push({ stack:closing });
 
     return {
       pageSize:"A4",
-      pageMargins:[40,50,40,50],
-      content: content,
-      styles:{
-        eyebrow:{fontSize:10, color:"#01ACBE", bold:true, font:F_DISPLAY},
-        coverTitle:{fontSize:32, bold:true, color:"#373A81", font:F_DISPLAY},
-        coverSub:{fontSize:15, color:"#F94262", font:F_DISPLAY},
-        coverLead:{fontSize:11, color:"#6a6ca6", font:F_TEXT},
-        coverDate:{fontSize:9, color:"#a9abcf", font:F_TEXT},
-        tocTitle:{fontSize:22, bold:true, color:"#373A81", margin:[0,0,0,16], font:F_DISPLAY},
-        tocEntry:{fontSize:11, color:"#373A81", font:F_TEXT},
-        groupTitle:{fontSize:18, bold:true, color:"#ffffff", font:F_DISPLAY},
-        itemTitle:{fontSize:11, bold:true, color:"#373A81", font:F_DISPLAY},
-        itemDesc:{fontSize:9, color:"#6a6ca6", font:F_TEXT},
-        closeTag:{fontSize:11, color:"#e7e8fa", font:F_TEXT},
-        closeLabel:{fontSize:11, bold:true, color:"#ffffff", font:F_DISPLAY},
-        closeVal:{fontSize:11, color:"#e7e8fa", font:F_TEXT}
+      pageMargins:[40,50,40,56],
+      content:content,
+      footer:function(currentPage, pageCount){
+        var skip = 1 + (cfg.how?1:0) + (cfg.toc?1:0);
+        if(currentPage <= skip || currentPage === pageCount) return null;
+        return { text:String(currentPage), alignment:"center", margin:[0,10,0,0],
+          font:"Fredoka", fontSize:9.5, color:"#A9ABCF" };
       },
-      defaultStyle:{ font:F_TEXT }
+      styles:{
+        coverTitle:{font:"Fredoka", fontSize:33, bold:true, color:C.noite, lineHeight:1.05},
+        coverSub:{font:"Fredoka", fontSize:15, color:C.rosa},
+        coverLead:{font:"Poppins", fontSize:10, color:C.suave, lineHeight:1.5},
+        coverKicker:{font:"Fredoka", fontSize:11, bold:true, color:"#ffffff", characterSpacing:2.4},
+        coverContact:{font:"Poppins", fontSize:9.5, color:"#DDDEF4"},
+        coverMeta:{font:"Poppins", fontSize:8, color:"#9FA1CC"},
+        howKicker:{font:"Fredoka", fontSize:9.5, bold:true, color:"#CFF0F4", characterSpacing:2.4},
+        howTitle:{font:"Fredoka", fontSize:27, bold:true, color:"#ffffff"},
+        howLead:{font:"Poppins", fontSize:10.5, color:"#DFF5F8", lineHeight:1.5},
+        stepNum:{font:"Fredoka", fontSize:16, bold:true},
+        stepTitle:{font:"Fredoka", fontSize:14, bold:true, color:"#ffffff"},
+        stepText:{font:"Poppins", fontSize:10, color:"#E2F6F9", lineHeight:1.45},
+        howCta:{font:"Fredoka", fontSize:12.5, bold:true, color:C.noite},
+        tocTitle:{font:"Fredoka", fontSize:26, bold:true, color:C.noite},
+        tocEntry:{font:"Poppins", fontSize:11, color:C.noite, lineHeight:1.7},
+        groupKicker:{font:"Fredoka", fontSize:8.5, bold:true, color:"#ffffff", characterSpacing:2, opacity:0.85},
+        groupTitle:{font:"Fredoka", fontSize:20, bold:true, color:"#ffffff"},
+        itemTitle:{font:"Fredoka", fontSize:11, bold:true, color:C.noite},
+        itemDesc:{font:"Poppins", fontSize:8.5, color:C.suave, lineHeight:1.4},
+        closeTag:{font:"Fredoka", fontSize:13, color:"#C9CBEF", lineHeight:1.4},
+        closeLabel:{font:"Fredoka", fontSize:9, bold:true, color:"#8C8FD4", characterSpacing:1.6},
+        closeVal:{font:"Poppins", fontSize:11.5, color:"#ffffff"}
+      },
+      defaultStyle:{ font:"Poppins" }
     };
+  }
+
+  function pdfItemCell(it, imgMap, cor){
+    var inner = [];
+    var img = it.image_url ? imgMap[it.image_url] : null;
+    if(img) inner.push({ image:img, fit:[168,132], alignment:"center", margin:[0,0,0,10] });
+    inner.push({ canvas:[{type:"rect", x:0,y:0, w:22,h:3, r:1.5, color:cor}], margin:[0,0,0,7] });
+    inner.push({ text:it.title||"", style:"itemTitle" });
+    if(it.description) inner.push({ text:it.description, style:"itemDesc", margin:[0,3,0,0] });
+    return { stack:inner, margin:[6,6,6,20] };
   }
 
   async function generatePdf(){
@@ -1158,11 +1287,12 @@
     if(!structure.length){ toast("Marque ao menos um item em algum macro grupo para gerar o PDF."); return; }
     var status = document.getElementById("pdf-status");
     var btn = document.getElementById("pdf-generate");
-    btn.disabled = true; status.textContent = "Carregando fontes da marca…";
+    if(!registerBrandFonts() || !(window.CASA_PDF_LOGOS && window.CASA_PDF_LOGOS.color)){
+      toast("Fontes e logos do PDF não carregaram (pdf-fonts.js). Recarregue a página e tente de novo.");
+      return;
+    }
+    btn.disabled = true; status.textContent = "Preparando imagens…";
 
-    var fontsOk = await ensureBrandFonts();
-
-    status.textContent = "Preparando imagens…";
     var urls = [];
     structure.forEach(function(g){ g.items.forEach(function(it){
       if(it.image_url && urls.indexOf(it.image_url)===-1) urls.push(it.image_url);
@@ -1174,19 +1304,35 @@
     }
 
     status.textContent = "Montando PDF…";
-    var logoColor = await fetchImageDataUrl("logo-color.png", 600);
-    var logoWhite = await fetchImageDataUrl("logo-white.png", 600);
+    var LG = window.CASA_PDF_LOGOS || {};
+    var logoColor = LG.color || null;
+    var logoWhite = LG.white || null;
 
     var cfg = state._pdfDraft.cover;
+    var filename = (slugify(state._pdfDraft.name||"catalogo")||"catalogo")+".pdf";
 
     try{
-      var doc = buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite, fontsOk);
-      pdfMake.createPdf(doc).download((slugify(state._pdfDraft.name||"catalogo")||"catalogo")+".pdf");
-      toast(fontsOk ? "PDF gerado!" : "PDF gerado (sem acesso às fontes da marca agora — usei a fonte padrão).");
+      var doc = buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite);
+      var pdfDoc = pdfMake.createPdf(doc);
+      pdfDoc.getBlob(function(blob){
+        try{
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url; a.download = filename;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+          toast("PDF gerado!");
+        }catch(err2){
+          console.error("Falha ao baixar o PDF:", err2);
+          toast("PDF montado, mas o download falhou. Veja o console (F12).");
+        }
+        btn.disabled = false; status.textContent = "";
+      });
     }catch(err){
-      toast("Erro ao gerar PDF.");
+      console.error("Erro ao gerar PDF:", err);
+      toast("Erro ao gerar PDF: "+(err&&err.message?err.message:"veja o console (F12)."));
+      btn.disabled = false; status.textContent = "";
     }
-    btn.disabled = false; status.textContent = "";
   }
 
   /* ============================ LEADS ============================ */
