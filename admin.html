@@ -103,6 +103,8 @@
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
 <script>
 (function(){
   "use strict";
@@ -209,6 +211,7 @@
       +   '<button data-tab="matriz">Matriz</button>'
       +   '<button data-tab="importar">Importar em lote</button>'
       +   '<button data-tab="config">Configurações</button>'
+      +   '<button data-tab="pdf">Catálogo PDF</button>'
       +   '<button data-tab="leads">Leads</button>'
       + '</div>'
       + '<div id="tabc"></div></div>';
@@ -225,6 +228,7 @@
     else if(state.tab==="matriz") renderMatrix();
     else if(state.tab==="importar") renderImport();
     else if(state.tab==="config") renderConfig();
+    else if(state.tab==="pdf") renderPdfTab();
     else renderLeads();
   }
   async function refresh(){ await loadAll(); renderTab(); }
@@ -721,6 +725,296 @@
     }).eq("id",1);
     if(r.error){ toast("Erro ao salvar."); return; }
     await loadAll(); toast("Configurações salvas.");
+  }
+
+  /* ============================ CATÁLOGO PDF ============================ */
+  function pdfSelected(itemId){
+    return (state._pdfSel && state._pdfSel[itemId] !== undefined) ? state._pdfSel[itemId] : true;
+  }
+  function setPdfSelected(itemId, v){
+    if(!state._pdfSel) state._pdfSel = {};
+    state._pdfSel[itemId] = v;
+  }
+
+  function renderPdfTab(){
+    var c = document.getElementById("tabc");
+    var s = state.settings || {};
+    var html = '<div class="card" style="margin-bottom:16px">'
+      + '<h3 style="margin-bottom:4px">Gerar catálogo em PDF</h3>'
+      + '<p class="muted" style="margin:0 0 14px">Escolha as categorias, seções e brinquedos que entram no PDF e ajuste os dados de contato que aparecem na última página.</p>'
+      + '<div class="grid2">'
+      +   '<div><label>Título da capa</label><input type="text" id="pdf-title" value="'+esc(s.hero_title||"Casa Lúdica Moema")+'" /></div>'
+      +   '<div><label>Subtítulo da capa</label><input type="text" id="pdf-sub" value="'+esc(s.hero_slogan||"Juntos por uma infância + lúdica")+'" /></div>'
+      + '</div>'
+      + '<div class="grid2" style="margin-top:12px">'
+      +   '<div><label>E-mail de contato (última página)</label><input type="text" id="pdf-email" value="'+esc(s.pdf_email||"")+'" placeholder="contato@casaludicamoema.com.br" /></div>'
+      +   '<div><label>WhatsApp exibido (última página)</label><input type="text" id="pdf-phone" value="'+esc(s.pdf_phone_display||"")+'" placeholder="(11) 99999-9999" /></div>'
+      + '</div>'
+      + '<div style="margin-top:12px"><label>Site (última página)</label><input type="text" id="pdf-site" value="'+esc(s.pdf_site_url||"casaludicamoema.com.br")+'" /></div>'
+      + '<button class="btn ghost sm" style="margin-top:12px" id="pdf-save-contact">Salvar dados de contato</button>'
+      + '</div>';
+
+    html += '<div class="card" style="margin-bottom:16px">'
+      + '<div class="row" style="justify-content:space-between;margin-bottom:10px">'
+      +   '<h3 style="margin:0">Selecionar conteúdo</h3>'
+      +   '<div class="row" style="gap:8px">'
+      +     '<button class="btn ghost sm" id="pdf-all">Selecionar tudo</button>'
+      +     '<button class="btn ghost sm" id="pdf-none">Limpar seleção</button>'
+      +   '</div>'
+      + '</div>';
+
+    if(!state.cats.length){
+      html += '<p class="muted">Cadastre categorias e seções na aba Catálogo primeiro.</p>';
+    }
+    state.cats.forEach(function(cat){
+      var secs = secsOf(cat.id);
+      html += '<div style="margin-bottom:18px">'
+        + '<div class="row" style="gap:8px;margin-bottom:8px">'
+        +   '<span class="swatch" style="background:'+esc(cat.color)+'"></span>'
+        +   '<h4 style="margin:0">'+esc(cat.name)+'</h4>'
+        +   '<button class="btn ghost sm" data-pdfcat="'+cat.id+'" style="margin-left:auto">Selecionar categoria</button>'
+        + '</div>';
+      secs.forEach(function(sec){
+        var its = itemsOf(sec.id);
+        if(!its.length) return;
+        html += '<div class="sec">'
+          + '<div class="row" style="justify-content:space-between;margin-bottom:8px">'
+          +   '<strong style="font-family:var(--ff-d)">'+esc(sec.name)+'</strong>'
+          +   '<button class="btn ghost sm" data-pdfsec="'+sec.id+'">Selecionar seção</button>'
+          + '</div>'
+          + '<div class="items">'
+          + its.map(function(it){
+              var thumb = it.image_url
+                ? '<img src="'+esc(it.image_url)+'" class="thumb" alt="" />'
+                : '<div class="thumb"></div>';
+              return '<label class="item" style="cursor:pointer">'
+                + '<input type="checkbox" data-pdfitem="'+it.id+'" '+(pdfSelected(it.id)?"checked":"")+' />'
+                + thumb
+                + '<span class="grow">'+esc(it.title)+(it.active?"":' <span class="pill">oculto</span>')+'</span>'
+                + '</label>';
+            }).join("")
+          + '</div></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="card">'
+      + '<button class="btn g" id="pdf-generate">Gerar PDF</button>'
+      + '<span id="pdf-status" class="muted" style="margin-left:12px"></span>'
+      + '</div>';
+
+    c.innerHTML = html;
+
+    document.getElementById("pdf-save-contact").onclick = savePdfContact;
+    document.getElementById("pdf-all").onclick = function(){ state.items.forEach(function(it){ setPdfSelected(it.id,true); }); renderPdfTab(); };
+    document.getElementById("pdf-none").onclick = function(){ state.items.forEach(function(it){ setPdfSelected(it.id,false); }); renderPdfTab(); };
+    document.getElementById("pdf-generate").onclick = generatePdf;
+
+    c.onchange = function(e){
+      var cb = e.target.closest("[data-pdfitem]");
+      if(cb) setPdfSelected(cb.dataset.pdfitem, cb.checked);
+    };
+    c.onclick = function(e){
+      var catBtn = e.target.closest("[data-pdfcat]");
+      if(catBtn){
+        secsOf(catBtn.dataset.pdfcat).forEach(function(sec){
+          itemsOf(sec.id).forEach(function(it){ setPdfSelected(it.id,true); });
+        });
+        renderPdfTab(); return;
+      }
+      var secBtn = e.target.closest("[data-pdfsec]");
+      if(secBtn){
+        itemsOf(secBtn.dataset.pdfsec).forEach(function(it){ setPdfSelected(it.id,true); });
+        renderPdfTab(); return;
+      }
+    };
+  }
+
+  async function savePdfContact(){
+    var r = await db.from("settings").update({
+      pdf_email: val("pdf-email"), pdf_phone_display: val("pdf-phone"), pdf_site_url: val("pdf-site"),
+      updated_at:new Date().toISOString()
+    }).eq("id",1);
+    if(r.error){ toast("Erro ao salvar contato."); return; }
+    await loadAll(); toast("Dados de contato salvos.");
+  }
+
+  function pdfCollectStructure(){
+    var out = [];
+    state.cats.forEach(function(cat){
+      var secs = [];
+      secsOf(cat.id).forEach(function(sec){
+        var its = itemsOf(sec.id).filter(function(it){ return pdfSelected(it.id); });
+        if(its.length) secs.push({sec:sec, items:its});
+      });
+      if(secs.length) out.push({cat:cat, secs:secs});
+    });
+    return out;
+  }
+
+  function fetchImageDataUrl(url, maxW){
+    return new Promise(function(resolve){
+      fetch(url, {mode:"cors"}).then(function(resp){
+        if(!resp.ok) throw new Error("http "+resp.status);
+        return resp.blob();
+      }).then(function(blob){
+        var objUrl = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function(){
+          var scale = Math.min(1, (maxW||500)/img.width);
+          var w = Math.max(1, Math.round(img.width*scale)), h = Math.max(1, Math.round(img.height*scale));
+          var canvas = document.createElement("canvas"); canvas.width=w; canvas.height=h;
+          var ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,w,h);
+          ctx.drawImage(img,0,0,w,h);
+          URL.revokeObjectURL(objUrl);
+          resolve(canvas.toDataURL("image/jpeg",0.82));
+        };
+        img.onerror = function(){ URL.revokeObjectURL(objUrl); resolve(null); };
+        img.src = objUrl;
+      }).catch(function(){ resolve(null); });
+    });
+  }
+
+  function pdfItemCell(it, imgMap){
+    var stack = [];
+    var img = it.image_url ? imgMap[it.image_url] : null;
+    if(img) stack.push({image:img, fit:[150,150], alignment:"center", margin:[0,0,0,6]});
+    stack.push({text: it.title||"", style:"itemTitle", alignment:"center"});
+    if(it.description) stack.push({text: it.description, style:"itemDesc", alignment:"center"});
+    return {stack: stack, margin:[8,8,8,16]};
+  }
+
+  function buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite){
+    var PW = 595.28, PH = 841.89;
+    var content = [];
+
+    /* ---------- capa ---------- */
+    var stripe = { columns: [
+      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#FF8736"}]},
+      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#F94262"}]},
+      {width:"*", canvas:[{type:"rect", x:0,y:0,w:1,h:6, color:"#5F94DA"}]}
+    ], columnGap:0, margin:[60,0,60,0] };
+
+    var coverStack = [{text:"", margin:[0,70,0,0]}];
+    if(logoColor) coverStack.push({image:logoColor, width:170, alignment:"center", margin:[0,0,0,26]});
+    coverStack.push({text: cfg.title, style:"coverTitle", alignment:"center"});
+    if(cfg.sub) coverStack.push({text: cfg.sub, style:"coverSub", alignment:"center", margin:[0,6,0,20]});
+    coverStack.push(stripe);
+    coverStack.push({text:"Catálogo de mobiliário e brinquedos lúdicos para escolas, clínicas, buffets e espaços de brincar.",
+      alignment:"center", style:"coverLead", margin:[60,26,60,0]});
+    coverStack.push({text:"Catálogo gerado em "+new Date().toLocaleDateString("pt-BR"), alignment:"center", style:"coverDate", margin:[0,70,0,0]});
+    content.push({ stack: coverStack });
+
+    /* ---------- índice ---------- */
+    content.push({ text:"Índice", style:"tocTitle", pageBreak:"before" });
+    content.push({ toc: { textStyle:"tocEntry", numberStyle:"tocEntry" } });
+
+    /* ---------- categorias / seções / itens ---------- */
+    structure.forEach(function(g){
+      content.push({
+        table:{ widths:["*"], body:[[
+          {text:g.cat.name, style:"catTitle", fillColor:g.cat.color, tocItem:true, margin:[14,10,14,10]}
+        ]] },
+        layout:"noBorders",
+        pageBreak:"before",
+        margin:[0,0,0,14]
+      });
+
+      g.secs.forEach(function(sg){
+        content.push({
+          table:{ widths:["*"], body:[[
+            {text:sg.sec.name, style:"secTitle", fillColor: sg.sec.color||g.cat.color, tocItem:true, tocMargin:[10,0,0,0], margin:[12,7,12,7]}
+          ]] },
+          layout:"noBorders",
+          margin:[0,10,0,10]
+        });
+
+        var rows = [];
+        for(var i=0;i<sg.items.length;i+=2){
+          var a = sg.items[i], b = sg.items[i+1];
+          rows.push([ pdfItemCell(a, imgMap), b?pdfItemCell(b, imgMap):{text:""} ]);
+        }
+        content.push({ table:{ widths:["*","*"], body: rows }, layout:"noBorders" });
+      });
+    });
+
+    /* ---------- última página ---------- */
+    content.push({
+      canvas:[{type:"rect", x:0, y:0, w:PW, h:PH, color:"#373A81"}],
+      absolutePosition:{x:0,y:0},
+      pageBreak:"before"
+    });
+    var closing = [{text:"", margin:[0,80,0,0]}];
+    if(logoWhite) closing.push({image:logoWhite, width:150, alignment:"center", margin:[0,0,0,18]});
+    closing.push({text:"Use com carinho. Crie com propósito. Encante com identidade.", style:"closeTag", alignment:"center", margin:[40,0,40,40]});
+    if(cfg.phone) closing.push({text:[{text:"WhatsApp   ", style:"closeLabel"},{text:cfg.phone, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
+    if(cfg.email) closing.push({text:[{text:"E-mail   ", style:"closeLabel"},{text:cfg.email, style:"closeVal"}], alignment:"center", margin:[0,0,0,10]});
+    if(cfg.site) closing.push({text:[{text:"Site   ", style:"closeLabel"},{text:cfg.site, style:"closeVal"}], alignment:"center"});
+    content.push({ stack: closing });
+
+    return {
+      pageSize:"A4",
+      pageMargins:[40,50,40,50],
+      content: content,
+      styles:{
+        coverTitle:{fontSize:30, bold:true, color:"#373A81"},
+        coverSub:{fontSize:14, color:"#373A81"},
+        coverLead:{fontSize:11, color:"#6a6ca6"},
+        coverDate:{fontSize:9, color:"#a9abcf"},
+        tocTitle:{fontSize:22, bold:true, color:"#373A81", margin:[0,0,0,16]},
+        tocEntry:{fontSize:11, color:"#373A81"},
+        catTitle:{fontSize:18, bold:true, color:"#ffffff"},
+        secTitle:{fontSize:13, bold:true, color:"#ffffff"},
+        itemTitle:{fontSize:11, bold:true, color:"#373A81"},
+        itemDesc:{fontSize:9, color:"#6a6ca6"},
+        closeTag:{fontSize:11, color:"#e7e8fa"},
+        closeLabel:{fontSize:11, bold:true, color:"#ffffff"},
+        closeVal:{fontSize:11, color:"#e7e8fa"}
+      },
+      defaultStyle:{ font:"Roboto" }
+    };
+  }
+
+  async function generatePdf(){
+    var structure = pdfCollectStructure();
+    if(!structure.length){ toast("Selecione ao menos um item para gerar o PDF."); return; }
+    var status = document.getElementById("pdf-status");
+    var btn = document.getElementById("pdf-generate");
+    btn.disabled = true; status.textContent = "Preparando imagens…";
+
+    var urls = [];
+    structure.forEach(function(g){ g.secs.forEach(function(sg){ sg.items.forEach(function(it){
+      if(it.image_url && urls.indexOf(it.image_url)===-1) urls.push(it.image_url);
+    }); }); });
+
+    var imgMap = {};
+    for(var i=0;i<urls.length;i++){
+      status.textContent = "Preparando imagens… ("+(i+1)+"/"+urls.length+")";
+      imgMap[urls[i]] = await fetchImageDataUrl(urls[i], 480);
+    }
+
+    status.textContent = "Montando PDF…";
+    var logoColor = await fetchImageDataUrl("logo-color.png", 600);
+    var logoWhite = await fetchImageDataUrl("logo-white.png", 600);
+
+    var cfg = {
+      title: val("pdf-title") || "Casa Lúdica Moema",
+      sub: val("pdf-sub") || "",
+      email: val("pdf-email") || "",
+      phone: val("pdf-phone") || "",
+      site: val("pdf-site") || ""
+    };
+
+    try{
+      var doc = buildPdfDoc(structure, imgMap, cfg, logoColor, logoWhite);
+      pdfMake.createPdf(doc).download("catalogo-casa-ludica-moema.pdf");
+      toast("PDF gerado!");
+    }catch(err){
+      toast("Erro ao gerar PDF.");
+    }
+    btn.disabled = false; status.textContent = "";
   }
 
   /* ============================ LEADS ============================ */
